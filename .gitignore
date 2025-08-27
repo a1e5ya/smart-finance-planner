@@ -65,3 +65,11 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Firebase
+backend/firebase-service-account.json
+firebase-service-account.json
+
+# Environment files
+.env
+*.env
