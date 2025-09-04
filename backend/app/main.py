@@ -82,8 +82,10 @@ async def root():
         ]
     }
 
-import os
-
 if __name__ == "__main__":
+    # Use Railway's PORT environment variable, fallback to 8001
     port = int(os.getenv("PORT", 8001))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
+    host = "0.0.0.0"
+    
+    print(f"🚀 Starting server on {host}:{port}")
+    uvicorn.run("main:app", host=host, port=port, reload=False)
