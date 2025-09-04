@@ -9,7 +9,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!user.value)
   const loading = ref(true)
   
-  const API_BASE = 'http://localhost:8001'
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'
   
   // Set up auth state listener
   const initAuth = () => {

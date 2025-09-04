@@ -290,6 +290,8 @@ import { auth } from '@/firebase/config'
 import { onAuthStateChanged } from 'firebase/auth'
 import LoginModal from '@/components/LoginModal.vue'
 
+// Replace the setup() function in App.vue with this updated version:
+
 export default {
   name: 'App',
   components: {
@@ -304,16 +306,25 @@ export default {
     const phase = ref('1 - Auth Complete')
     const showLoginModal = ref(false)
 
-    const API_BASE = 'http://localhost:8001'
+    // Dynamic API base URL - uses environment variable in production
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'
+    
+    console.log('API_BASE:', API_BASE) // Debug log to verify correct URL
 
     // Check backend health
     const checkBackend = async () => {
       try {
-        const response = await axios.get(`${API_BASE}/health`)
+        console.log('Checking backend at:', `${API_BASE}/health`)
+        const response = await axios.get(`${API_BASE}/health`, {
+          timeout: 10000 // 10 second timeout
+        })
         backendStatus.value = 'Connected ✅'
         phase.value = response.data.phase || '1'
+        console.log('Backend health check successful:', response.data)
       } catch (error) {
         backendStatus.value = 'Disconnected ❌'
+        console.error('Backend health check failed:', error.message)
+        console.error('Attempted URL:', `${API_BASE}/health`)
       }
     }
 
@@ -333,9 +344,13 @@ export default {
           headers.Authorization = `Bearer ${token}`
         }
 
+        console.log('Sending message to:', `${API_BASE}/chat/command`)
         const response = await axios.post(`${API_BASE}/chat/command`, {
           message: messageText
-        }, { headers })
+        }, { 
+          headers,
+          timeout: 15000 // 15 second timeout for chat
+        })
         
         chatResponse.value = response.data.response
         
@@ -351,11 +366,20 @@ export default {
         }
         
       } catch (error) {
-        chatResponse.value = 'Sorry, I couldn\'t connect to the backend. Please check if the server is running on port 8001.'
         console.error('Chat request failed:', error)
+        if (error.code === 'ECONNABORTED') {
+          chatResponse.value = 'Request timed out. The server might be starting up - please try again in a moment.'
+        } else if (error.response) {
+          chatResponse.value = `Server error: ${error.response.status}. Please check if the backend is running.`
+        } else if (error.request) {
+          chatResponse.value = `Cannot reach the backend at ${API_BASE}. Please check the server status.`
+        } else {
+          chatResponse.value = 'An unexpected error occurred. Please try again.'
+        }
       }
     }
 
+    // Rest of your functions remain the same...
     const showTab = (tabName) => {
       currentTab.value = tabName
     }
@@ -390,7 +414,7 @@ export default {
       })
 
       setTimeout(() => {
-        chatResponse.value = "🎉 Phase 1 Complete! Authentication system working. Try signing in and test personalized chat responses!"
+        chatResponse.value = `🎉 Phase 1 Complete! Authentication system working. Backend: ${API_BASE}`
       }, 2000)
     })
 
