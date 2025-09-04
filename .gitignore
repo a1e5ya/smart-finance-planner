@@ -69,6 +69,8 @@ logs/
 # Firebase
 backend/firebase-service-account.json
 firebase-service-account.json
+frontend/firebase/config.py
+
 
 # Environment files
 .env
