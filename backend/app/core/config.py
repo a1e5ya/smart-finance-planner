@@ -1,23 +1,39 @@
 import os
+import json
 from typing import List
-from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
 
-class Settings(BaseSettings):
-    # Basic app settings
-    APP_NAME: str = "Smart Finance Planner"
-    DEBUG: bool = True
+# Load environment variables
+load_dotenv()
+
+class Settings:
+    """Simple settings class without pydantic complexity"""
     
-    # API settings
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173"
-    ]
+    def __init__(self):
+        # Database
+        self.DATABASE_URL = os.getenv("DATABASE_URL", "")
+        
+        # Firebase
+        self.FIREBASE_SERVICE_ACCOUNT_JSON = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "{}")
+        
+        # App
+        self.APP_NAME = "Smart Finance Planner API"
+        self.VERSION = "1.0.0"
+        self.DEBUG = True
     
-    # LLM settings (optional for Phase 0)
-    HF_API_KEY: str = ""
-    HF_MODEL_ID: str = "microsoft/DialoGPT-medium"
+    @property
+    def ALLOWED_ORIGINS(self) -> List[str]:
+        """Parse CORS origins from environment"""
+        cors_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,https://your-app.vercel.app")
+        return [origin.strip() for origin in cors_env.split(",")]
     
-    class Config:
-        env_file = ".env"
+    @property
+    def firebase_credentials(self) -> dict:
+        """Parse Firebase service account JSON"""
+        try:
+            return json.loads(self.FIREBASE_SERVICE_ACCOUNT_JSON)
+        except json.JSONDecodeError:
+            print("Warning: Could not parse Firebase credentials")
+            return {}
 
 settings = Settings()

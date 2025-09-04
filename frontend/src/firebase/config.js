@@ -3,7 +3,7 @@ import { getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvide
 
 // Replace with your Firebase config from Step 1.3
 const firebaseConfig = {
-  apiKey: "AIzaSyBr4fjr3evFln-yyXwzVt-vK798QdEELs8",
+  apiKey: "AIzaSyBDQ5RKy0vQIo0aL_fh4U92OFOHXoRjbqk",
   authDomain: "smart-finance-planner.firebaseapp.com",
   projectId: "smart-finance-planner",
   storageBucket: "smart-finance-planner.firebasestorage.app",
