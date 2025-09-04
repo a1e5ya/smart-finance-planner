@@ -24,8 +24,22 @@ class Settings:
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
         """Parse CORS origins from environment"""
-        cors_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,https://your-app.vercel.app")
-        return [origin.strip() for origin in cors_env.split(",")]
+        cors_env = os.getenv("ALLOWED_ORIGINS", "")
+        
+        if not cors_env:
+            # Default origins if not set
+            default_origins = [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "https://smart-finance-planner.vercel.app"
+            ]
+            print(f"⚠️ ALLOWED_ORIGINS not set, using defaults: {default_origins}")
+            return default_origins
+        
+        # Parse origins, strip whitespace, and remove empty strings
+        origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+        print(f"✅ CORS Origins loaded: {origins}")
+        return origins
     
     @property
     def firebase_credentials(self) -> dict:

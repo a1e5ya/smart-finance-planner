@@ -5,6 +5,21 @@ import uvicorn
 import sys
 import os
 
+# Add this after your imports and before the lifespan function:
+
+print("🔧 CORS Debug Information:")
+print(f"   ALLOWED_ORIGINS env var: {os.getenv('ALLOWED_ORIGINS', 'NOT SET')}")
+print(f"   Parsed origins: {settings.ALLOWED_ORIGINS}")
+
+# Update your CORS middleware configuration:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
 # Add parent directory to path so we can import app modules
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
