@@ -312,21 +312,44 @@ export default {
     console.log('API_BASE:', API_BASE) // Debug log to verify correct URL
 
     // Check backend health
-    const checkBackend = async () => {
-      try {
-        console.log('Checking backend at:', `${API_BASE}/health`)
-        const response = await axios.get(`${API_BASE}/health`, {
-          timeout: 10000 // 10 second timeout
-        })
-        backendStatus.value = 'Connected ✅'
-        phase.value = response.data.phase || '1'
-        console.log('Backend health check successful:', response.data)
-      } catch (error) {
-        backendStatus.value = 'Disconnected ❌'
-        console.error('Backend health check failed:', error.message)
-        console.error('Attempted URL:', `${API_BASE}/health`)
-      }
+const checkBackend = async () => {
+  try {
+    console.log('=== BACKEND DEBUG INFO ===')
+    console.log('API_BASE:', API_BASE)
+    console.log('Environment:', import.meta.env.MODE)
+    console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL)
+    console.log('Checking backend at:', `${API_BASE}/health`)
+    
+    const response = await axios.get(`${API_BASE}/health`, {
+      timeout: 10000 // 10 second timeout
+    })
+    
+    backendStatus.value = 'Connected ✅'
+    phase.value = response.data.phase || '1'
+    console.log('✅ Backend health check successful:', response.data)
+    
+  } catch (error) {
+    backendStatus.value = 'Disconnected ❌'
+    
+    console.log('=== ERROR DEBUG INFO ===')
+    console.error('Backend health check failed:', error)
+    console.error('Error type:', error.constructor.name)
+    console.error('Error message:', error.message)
+    console.error('Error code:', error.code)
+    
+    if (error.response) {
+      console.error('Response status:', error.response.status)
+      console.error('Response data:', error.response.data)
+      console.error('Response headers:', error.response.headers)
+    } else if (error.request) {
+      console.error('Request was made but no response received')
+      console.error('Request details:', error.request)
     }
+    
+    console.error('Axios config:', error.config)
+    console.error('Attempted URL:', `${API_BASE}/health`)
+  }
+}
 
     // Send chat message with auth token
     const sendMessage = async (message = null) => {
