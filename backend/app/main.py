@@ -24,7 +24,6 @@ async def lifespan(app: FastAPI):
     db_success = await init_database()
     if not db_success:
         print("❌ Failed to initialize database!")
-        # In production, you might want to exit here
     
     print("✅ API startup complete!")
     
@@ -65,7 +64,9 @@ async def health_check():
             "audit_logging",
             "personalized_chat"
         ],
-        "database": "✅ Connected" if settings.DATABASE_URL else "❌ Not configured"
+        "database": "✅ Connected" if settings.DATABASE_URL else "❌ Not configured",
+        "port": os.getenv("PORT", "8001"),
+        "host": "Railway" if os.getenv("RAILWAY_ENVIRONMENT") else "Local"
     }
 
 @app.get("/")
@@ -79,7 +80,8 @@ async def root():
             "/auth/me - Get user profile", 
             "/chat/command - Send chat message",
             "/docs - API documentation"
-        ]
+        ],
+        "environment": "Railway" if os.getenv("RAILWAY_ENVIRONMENT") else "Local"
     }
 
 if __name__ == "__main__":
