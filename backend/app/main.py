@@ -5,26 +5,19 @@ import uvicorn
 import sys
 import os
 
-# Add this after your imports and before the lifespan function:
-
-print("🔧 CORS Debug Information:")
-print(f"   ALLOWED_ORIGINS env var: {os.getenv('ALLOWED_ORIGINS', 'NOT SET')}")
-print(f"   Parsed origins: {settings.ALLOWED_ORIGINS}")
-
-# Update your CORS middleware configuration:
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-)
-
 # Add parent directory to path so we can import app modules
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
+# Import settings FIRST
 from app.core.config import settings
+
+# NOW we can use settings for debug output
+print("🔧 CORS Debug Information:")
+print(f"   ALLOWED_ORIGINS env var: {os.getenv('ALLOWED_ORIGINS', 'NOT SET')}")
+print(f"   Parsed origins: {settings.ALLOWED_ORIGINS}")
+
+# Import other modules after settings
 from app.routers import auth, chat
 from app.models.database import init_database
 
@@ -54,12 +47,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
+# CORS middleware with debug info
+print(f"🌐 Setting up CORS with origins: {settings.ALLOWED_ORIGINS}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -80,6 +74,7 @@ async def health_check():
             "personalized_chat"
         ],
         "database": "✅ Connected" if settings.DATABASE_URL else "❌ Not configured",
+        "cors_origins": settings.ALLOWED_ORIGINS,  # Add this for debugging
         "port": os.getenv("PORT", "8001"),
         "host": "Railway" if os.getenv("RAILWAY_ENVIRONMENT") else "Local"
     }
