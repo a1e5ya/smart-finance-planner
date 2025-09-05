@@ -5,7 +5,7 @@ from typing import Dict, Optional, Any
 class HuggingFaceLLM:
     def __init__(self):
         self.api_key = os.getenv("HF_API_KEY")
-        self.model_id = os.getenv("HF_MODEL_ID", "microsoft/DialoGPT-medium")
+        self.model_id = os.getenv("HF_MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.3")
         self.base_url = "https://api-inference.huggingface.co/models"
         
     async def query(self, prompt: str, max_tokens: int = 100) -> Dict[str, Any]:
