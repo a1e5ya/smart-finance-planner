@@ -2,344 +2,341 @@
   <div id="app">
     <!-- Top Bar -->
     <div class="top-bar">
-      <div 
-        class="app-logo" 
-        :class="{ active: currentTab === 'dashboard' }"
+      <button 
+        class="btn btn-active"
         @click="showTab('dashboard')"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
-          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" fill="currentColor"/>
-        </svg>
-        Financial Dashboard
-      </div>
+        <span class="text-medium">Financial Dashboard</span>
+      </button>
       
-      <div class="nav-tabs">
-        <div 
-          class="nav-tab" 
-          :class="{ active: currentTab === 'transactions' }"
+      <div class="flex flex-gap">
+        <button 
+          class="btn"
+          :class="{ 'btn-active': currentTab === 'transactions' }"
           @click="showTab('transactions')"
         >
           Transactions
-        </div>
-        <div 
-          class="nav-tab"
-          :class="{ active: currentTab === 'categories' }"
+        </button>
+        <button 
+          class="btn"
+          :class="{ 'btn-active': currentTab === 'categories' }"
           @click="showTab('categories')"
         >
           Categories
-        </div>
-        <div 
-          class="nav-tab"
-          :class="{ active: currentTab === 'timeline' }"
+        </button>
+        <button 
+          class="btn"
+          :class="{ 'btn-active': currentTab === 'timeline' }"
           @click="showTab('timeline')"
         >
           Timeline
-        </div>
+        </button>
       </div>
       
-      <div class="top-bar-right">
-        <div 
-          class="settings-icon" 
-          :class="{ active: currentTab === 'settings' }"
+      <div class="flex flex-center flex-gap">
+        <button 
+          class="btn btn-icon"
+          :class="{ 'btn-active': currentTab === 'settings' }"
           @click="showTab('settings')" 
           title="Settings"
         >
           ⚙️
-        </div>
-        <div class="user-name" @click="handleUserClick">
+        </button>
+        <span class="text-medium" @click="handleUserClick">
           {{ user ? (user.displayName || user.email.split('@')[0]) : 'Sign In' }}
-        </div>
-        <div class="logout-icon" @click="handleLogout" :title="user ? 'Logout' : 'Sign In'">
+        </span>
+        <button 
+          class="btn btn-icon" 
+          @click="handleLogout" 
+          :title="user ? 'Logout' : 'Sign In'"
+        >
           {{ user ? '🚪' : '👤' }}
-        </div>
+        </button>
       </div>
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
-      <div class="content-area">
-        <!-- Dashboard Tab - Transaction Import Focus -->
-        <div v-if="currentTab === 'dashboard'" class="tab-content">
-
-          <!-- Import Status Cards -->
-          <div class="import-status-grid">
-            <div class="status-card">
-              <div class="status-icon">📥</div>
-              <div class="status-info">
-                <h3>Data Import</h3>
-                <div class="status-value">{{ transactionCount }} transactions</div>
-                <div class="status-detail">Ready to import CSV files</div>
+      <!-- Dashboard Tab -->
+      <div v-if="currentTab === 'dashboard'" class="tab-content">
+        <!-- Status Cards -->
+        <div class="section">
+          <div class="grid grid-auto">
+            <div class="card flex flex-gap">
+              <div>
+                <div class="text-small text-muted">Data Import</div>
+                <div class="text-medium">{{ transactionCount }} transactions</div>
+                <div class="text-small text-light">Ready to import CSV files</div>
               </div>
             </div>
             
-            <div class="status-card">
-              <div class="status-icon">👤</div>
-              <div class="status-info">
-                <h3>User Status</h3>
-                <div class="status-value">{{ user ? '✅ Signed In' : '❌ Anonymous' }}</div>
-                <div class="status-detail">{{ user ? user.email.split('@')[0] : 'Sign in to save data' }}</div>
-              </div>
-            </div>
             
-            <div class="status-card">
-              <div class="status-icon">🔗</div>
-              <div class="status-info">
-                <h3>Connection</h3>
-                <div class="status-value">{{ backendStatus }}</div>
-                <div class="status-detail">Backend API ready</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Quick Import Section -->
-          <div class="quick-import-section">
-            <div class="import-card">
-              <div class="import-header">
-                <h2>📁 Import Your Financial Data</h2>
-                <p>Upload CSV files from your bank or financial institution to get started</p>
-              </div>
-              
-              <div class="import-actions">
-                <div class="file-drop-zone" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
-                  <div class="drop-zone-content">
-                    <div class="upload-icon">📄</div>
-                    <h3>Drag & Drop CSV Files</h3>
-                    <p>Or click to browse and select files</p>
-                    <div class="supported-formats">
-                      <span>Supported: .csv, .xlsx</span>
-                    </div>
-                  </div>
-                  <input 
-                    ref="fileInput" 
-                    type="file" 
-                    accept=".csv,.xlsx" 
-                    multiple 
-                    @change="handleFileSelect" 
-                    style="display: none;"
-                  >
-                </div>
-                
-                <div class="import-options">
-                  <button class="import-btn primary" @click="triggerFileUpload">
-                    📥 Choose Files
-                  </button>
-                  <button class="import-btn secondary" @click="showSampleData">
-                    👁️ View Sample
-                  </button>
-                  <button class="import-btn secondary" @click="sendMessage('help import')">
-                    ❓ Import Help
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent Activity -->
-          <div class="recent-activity">
-            <h3>Recent Activity</h3>
-            <div class="activity-list">
-              <div v-if="recentUploads.length === 0" class="no-activity">
+            <div class="card flex flex-gap">
+            <div class="text-medium section-header">Recent Activity</div>
+            <div class="flex-column flex-gap-sm">
+              <div v-if="recentUploads.length === 0" class="text-center text-light">
                 No recent imports. Upload your first CSV file to get started!
               </div>
-              <div v-for="upload in recentUploads" :key="upload.id" class="activity-item">
-                <div class="activity-icon">{{ upload.status === 'success' ? '✅' : '⏳' }}</div>
-                <div class="activity-details">
-                  <div class="activity-title">{{ upload.filename }}</div>
-                  <div class="activity-meta">{{ upload.timestamp }} • {{ upload.rows }} rows</div>
+              <div v-for="upload in recentUploads" :key="upload.id" class="card flex flex-gap">
+                <div class="status-icon">{{ upload.status === 'success' ? '✅' : '⏳' }}</div>
+                <div>
+                  <div class="text-medium">{{ upload.filename }}</div>
+                  <div class="text-small text-light">{{ upload.timestamp }} • {{ upload.rows }} rows</div>
                 </div>
               </div>
+            </div>
+
             </div>
           </div>
         </div>
 
-        <!-- Transactions Tab -->
-        <div v-else-if="currentTab === 'transactions'" class="tab-content">
-          <div class="transactions-header">
-            <h2>💳 Transaction Management</h2>
-            <div class="transaction-stats">
-              <span>Total: {{ transactionCount }} transactions</span>
-              <span>•</span>
-              <span>User: {{ user ? user.email.split('@')[0] : 'Guest' }}</span>
+        <!-- Import Section -->
+        <div class="section">
+          <div class="container container-large">
+            <div class="section-header text-center">
+              <div class="text-large">Import Your Financial Data</div>
+              <div class="text-medium text-light">Upload CSV files from your bank or financial institution to get started</div>
             </div>
-          </div>
-
-          <div class="transactions-content">
-            <div class="placeholder-section">
-              <div class="placeholder-title">Import & Manage Transactions</div>
-              <div class="placeholder-text">
-                Upload CSV files from your bank to automatically categorize and analyze your spending patterns.
+            
+            <div class="drop-zone" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
+              <div class="flex-column flex-center flex-gap">
+                <div class="text-large">Drag & Drop CSV Files</div>
+                <div class="text-medium text-light">Or click to browse and select files</div>
+                <div class="text-small text-muted">Supported: .csv, .xlsx</div>
               </div>
-              <button class="placeholder-button" @click="showTab('dashboard')">
-                📥 Start Import
+              <input 
+                ref="fileInput" 
+                type="file" 
+                accept=".csv,.xlsx" 
+                multiple 
+                @change="handleFileSelect" 
+                style="display: none;"
+              >
+            </div>
+            
+            <div class="flex flex-center flex-gap flex-wrap">
+              <button class="btn btn-active" @click="triggerFileUpload">
+                Choose Files
+              </button>
+              <button class="btn" @click="showSampleData">
+                View Sample
+              </button>
+              <button class="btn" @click="sendMessage('help import')">
+                Import Help
               </button>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div class="placeholder-section">
-              <div class="placeholder-title">Smart Categorization</div>
-              <div class="placeholder-text">
-                AI-powered transaction categorization with manual override capabilities.
-              </div>
-            </div>
+      <!-- Transactions Tab -->
+      <div v-else-if="currentTab === 'transactions'" class="tab-content">
+        <div class="flex-between section-header">
+          <div class="text-large">Transaction Management</div>
+          <div class="text-small text-light">
+            Total: {{ transactionCount }} transactions • User: {{ user ? user.email.split('@')[0] : 'Guest' }}
           </div>
         </div>
 
-        <!-- Categories Tab -->
-        <div v-else-if="currentTab === 'categories'" class="tab-content">
-          <div class="categories-layout">
-            <div class="category-tree">
-              <h3>Category Hierarchy</h3>
-              <div class="category-item selected">🍽️ Food & Dining</div>
-              <div class="category-item" style="padding-left: 32px;">🏪 Restaurants</div>
-              <div class="category-item" style="padding-left: 32px;">🛒 Groceries</div>
-              <div class="category-item">🚗 Transportation</div>
-              <div class="category-item" style="padding-left: 32px;">⛽ Gas</div>
-              <div class="category-item" style="padding-left: 32px;">🚌 Public Transit</div>
-              <div class="category-item">🏠 Housing</div>
-              <div class="category-item">💼 Business</div>
-              <div class="category-item">🎯 Goals</div>
+        <div class="grid grid-2">
+          <div class="container text-center">
+            <div class="text-medium">Import & Manage Transactions</div>
+            <div class="text-small text-light">
+              Upload CSV files from your bank to automatically categorize and analyze your spending patterns.
+            </div>
+            <button class="btn btn-active" @click="showTab('dashboard')">
+              Start Import
+            </button>
+          </div>
+
+          <div class="container text-center">
+            <div class="text-medium">Smart Categorization</div>
+            <div class="text-small text-light">
+              AI-powered transaction categorization with manual override capabilities.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categories Tab -->
+      <div v-else-if="currentTab === 'categories'" class="tab-content">
+        <div class="grid grid-sidebar">
+          <div class="container">
+            <div class="text-medium section-header">Category Hierarchy</div>
+            <div class="flex-column">
+              <button class="category-btn active">
+                <span>🍽️</span>
+                <span>Food & Dining</span>
+              </button>
+              <button class="category-btn category-indent">
+                <span>🏪</span>
+                <span>Restaurants</span>
+              </button>
+              <button class="category-btn category-indent">
+                <span>🛒</span>
+                <span>Groceries</span>
+              </button>
+              <button class="category-btn">
+                <span>🚗</span>
+                <span>Transportation</span>
+              </button>
+              <button class="category-btn category-indent">
+                <span>⛽</span>
+                <span>Gas</span>
+              </button>
+              <button class="category-btn category-indent">
+                <span>🚌</span>
+                <span>Public Transit</span>
+              </button>
+              <button class="category-btn">
+                <span>🏠</span>
+                <span>Housing</span>
+              </button>
+              <button class="category-btn">
+                <span>💼</span>
+                <span>Business</span>
+              </button>
+              <button class="category-btn">
+                <span>🎯</span>
+                <span>Goals</span>
+              </button>
+            </div>
+          </div>
+          
+          <div class="container">
+            <div class="text-medium section-header">Smart Categorization</div>
+            <div class="text-small text-light">
+              {{ user ? `Personalized categories for ${user.email.split('@')[0]}` : 'Sign in to create custom categories' }}
             </div>
             
-            <div class="category-details">
-              <h3>Smart Categorization</h3>
-              <p>
-                {{ user ? `Personalized categories for ${user.email.split('@')[0]}` : 'Sign in to create custom categories' }}
-              </p>
-              
-              <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
-                <button class="placeholder-button">Split Category</button>
-                <button class="placeholder-button">Merge Categories</button>
-                <button class="placeholder-button">Add Rule</button>
-              </div>
-              
-              <div class="chart-placeholder" style="height: 200px;">
-                📊<br>
-                Category Analytics<br>
-                <small>Import transactions to see category breakdown</small>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Timeline Tab -->
-        <div v-else-if="currentTab === 'timeline'" class="tab-content">
-          <div class="timeline-controls">
-            <div class="timeline-control active">Month</div>
-            <div class="timeline-control">Quarter</div>
-            <div class="timeline-control">Year</div>
-            <span style="margin-left: 20px; color: rgba(139, 69, 19, 0.7);">
-              {{ user ? `Timeline for ${user.email.split('@')[0]}` : 'Sign in for personalized timeline' }}
-            </span>
-          </div>
-
-          <div class="chart-placeholder" style="height: 400px; margin-bottom: 24px;">
-            📈<br>
-            Interactive Financial Timeline<br>
-            <small>Import transaction data to see your financial timeline</small>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-            <div class="placeholder-section">
-              <div class="placeholder-title">Financial Goals</div>
-              <div class="placeholder-text">
-                Set and track financial goals after importing your transaction data.
-              </div>
+            <div class="flex flex-gap flex-wrap">
+              <button class="btn">Split Category</button>
+              <button class="btn">Merge Categories</button>
+              <button class="btn">Add Rule</button>
             </div>
             
-            <div class="placeholder-section">
-              <div class="placeholder-title">Scenario Planning</div>
-              <div class="placeholder-text">Create what-if scenarios for your financial future.</div>
-              <button class="placeholder-button">Create Scenario</button>
+            <div class="container text-center" style="height: 12.5rem;">
+              <div class="text-medium">Category Analytics</div>
+              <div class="text-small text-light">Import transactions to see category breakdown</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline Tab -->
+      <div v-else-if="currentTab === 'timeline'" class="tab-content">
+        <div class="flex flex-between flex-wrap">
+          <div class="flex flex-gap">
+            <button class="btn btn-active">Month</button>
+            <button class="btn">Quarter</button>
+            <button class="btn">Year</button>
+          </div>
+          <div class="text-small text-light">
+            {{ user ? `Timeline for ${user.email.split('@')[0]}` : 'Sign in for personalized timeline' }}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="container text-center" style="height: 25rem;">
+            <div class="text-large">Interactive Financial Timeline</div>
+            <div class="text-medium text-light">Import transaction data to see your financial timeline</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="container text-center">
+            <div class="text-medium">Financial Goals</div>
+            <div class="text-small text-light">
+              Set and track financial goals after importing your transaction data.
+            </div>
+          </div>
+          
+          <div class="container text-center">
+            <div class="text-medium">Scenario Planning</div>
+            <div class="text-small text-light">Create what-if scenarios for your financial future.</div>
+            <button class="btn">Create Scenario</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div v-else-if="currentTab === 'settings'" class="tab-content">
+        
+        <!-- System Status -->
+        <div class="section">
+          <div class="container">
+            <div class="text-medium section-header">System Status</div>
+            <div class="grid grid-auto">
+              <div class="card text-center">
+                <div class="text-small text-muted">Authentication</div>
+                <div class="text-medium">{{ user ? 'Signed In' : 'Anonymous' }}</div>
+                <div class="text-small text-light">{{ user ? user.email : 'Not authenticated' }}</div>
+              </div>
+              <div class="card text-center">
+                <div class="text-small text-muted">Backend Status</div>
+                <div class="text-medium">{{ backendStatus }}</div>
+                <div class="text-small text-light">API Connection</div>
+              </div>
+              <div class="card text-center">
+                <div class="text-small text-muted">Phase Progress</div>
+                <div class="text-medium">{{ phase }}</div>
+                <div class="text-small text-light">Current Development Phase</div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Settings Tab - System Information Moved Here -->
-        <div v-else-if="currentTab === 'settings'" class="tab-content">
-          <div class="settings-layout">
-            <div class="settings-main">
-              <h2>⚙️ Settings & System Status</h2>
-              
-              <!-- System Status Section -->
-              <div class="settings-section">
-                <h3>🔧 System Status</h3>
-                <div class="system-indicators">
-                  <div class="system-card">
-                    <h4>Authentication</h4>
-                    <div class="value">{{ user ? '✅ Signed In' : '❌ Anonymous' }}</div>
-                    <div class="detail">{{ user ? user.email : 'Not authenticated' }}</div>
-                  </div>
-                  <div class="system-card">
-                    <h4>Backend Status</h4>
-                    <div class="value">{{ backendStatus }}</div>
-                    <div class="detail">API Connection</div>
-                  </div>
-                  <div class="system-card">
-                    <h4>Phase Progress</h4>
-                    <div class="value">{{ phase }}</div>
-                    <div class="detail">Current Development Phase</div>
-                  </div>
-                  <div class="system-card">
-                    <h4>Database</h4>
-                    <div class="value">🔄 Phase 2</div>
-                    <div class="detail">Coming Soon</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- User Profile Section -->
-              <div class="settings-section">
-                <h3>👤 User Profile</h3>
-                <div class="user-profile">
-                  <div v-if="user" class="profile-info">
-                    <p><strong>Email:</strong> {{ user.email }}</p>
-                    <p><strong>UID:</strong> {{ user.uid.substring(0, 16) }}...</p>
-                    <p><strong>Display Name:</strong> {{ user.displayName || 'Not set' }}</p>
-                    <button class="settings-button" @click="handleLogout">Sign Out</button>
-                  </div>
-                  <div v-else class="profile-info">
-                    <p>Sign in to access personalized features and secure data storage.</p>
-                    <button class="settings-button" @click="showLoginModal = true">Sign In</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Data Management Section -->
-              <div class="settings-section">
-                <h3>📊 Data Management</h3>
-                <div class="data-actions">
-                  <button class="settings-button">📥 Import Data</button>
-                  <button class="settings-button">📤 Export Data</button>
-                  <button class="settings-button">🗑️ Clear All Data</button>
-                  <button class="settings-button">🔄 Reset Categories</button>
-                </div>
-              </div>
-
-              <!-- Development Info -->
-              <div class="settings-section">
-                <h3>🔮 Next Phase Preview</h3>
-                <div class="phase-preview">
-                  <div class="preview-item">🔜 Database Integration (NeonDB)</div>
-                  <div class="preview-item">🔜 Transaction Table Storage</div>
-                  <div class="preview-item">🔜 Audit Logging</div>
-                  <div class="preview-item">🔜 CSV Import Processing</div>
-                </div>
-              </div>
+        <!-- User Profile -->
+        <div class="section">
+          <div class="container">
+            <div class="text-medium section-header">User Profile</div>
+            <div v-if="user">
+              <div class="text-small"><strong>Email:</strong> {{ user.email }}</div>
+              <div class="text-small"><strong>UID:</strong> {{ user.uid.substring(0, 16) }}...</div>
+              <div class="text-small"><strong>Display Name:</strong> {{ user.displayName || 'Not set' }}</div>
+              <button class="btn" @click="handleLogout">Sign Out</button>
+            </div>
+            <div v-else>
+              <div class="text-small text-light">Sign in to access personalized features and secure data storage.</div>
+              <button class="btn" @click="showLoginModal = true">Sign In</button>
             </div>
           </div>
         </div>
+
+        <!-- Data Management -->
+        <div class="section">
+          <div class="container">
+            <div class="text-medium section-header">Data Management</div>
+            <div class="flex flex-gap flex-wrap">
+              <button class="btn">Import Data</button>
+              <button class="btn">Export Data</button>
+              <button class="btn">Clear All Data</button>
+              <button class="btn">Reset Categories</button>
+            </div>
+          </div>
+        </div>
+
+        
       </div>
     </div>
 
     <!-- Chat Bar -->
     <div class="chat-bar">
+      <!-- Chat History with External Scrollbar -->
+      <div v-if="chatHistory.length > 0" class="chat-history">
+        <div v-for="(item, index) in chatHistory" :key="index" class="history-item">
+          <div class="text-small text-muted">You: {{ item.message }}</div>
+          <div class="text-small">Bot: {{ item.response }}</div>
+        </div>
+      </div>
+
+      <!-- Chat Response -->
       <div v-if="chatResponse" class="chat-response">
         {{ chatResponse }}
       </div>
       
-      <div class="chat-input-container">
-        <button class="expand-history" @click="toggleChatHistory" :class="{ active: showChatHistory }">
-          {{ showChatHistory ? '↓' : '↑' }}
-        </button>
+      <!-- Chat Input -->
+      <div class="flex flex-gap">
         <input 
           type="text" 
           class="chat-input" 
@@ -347,26 +344,9 @@
           v-model="chatInput"
           @keypress.enter="sendMessage()"
         >
-        <button class="send-button" @click="sendMessage()">
-          ➤
+        <button class="btn btn-active" @click="sendMessage()">
+          Send
         </button>
-      </div>
-
-      <!-- Chat History Panel -->
-      <div v-if="showChatHistory" class="chat-history">
-        <div class="chat-history-header">
-          <h4>Recent Conversations</h4>
-          <button @click="clearChatHistory" class="clear-history">Clear</button>
-        </div>
-        <div class="chat-history-items">
-          <div v-if="chatHistory.length === 0" class="no-history">
-            No conversation history yet. Start chatting to see your messages here!
-          </div>
-          <div v-for="(item, index) in chatHistory" :key="index" class="history-item">
-            <div class="history-message user">{{ item.message }}</div>
-            <div class="history-message bot">{{ item.response }}</div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -395,7 +375,6 @@ export default {
     const backendStatus = ref('Checking...')
     const phase = ref('1 - Transaction Import')
     const showLoginModal = ref(false)
-    const showChatHistory = ref(false)
     const transactionCount = ref(0)
     const recentUploads = ref([])
     const chatHistory = ref([])
@@ -404,15 +383,24 @@ export default {
     // Dynamic API base URL
     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'
 
+    // Initialize with welcome message
+    const initializeWelcomeMessage = () => {
+      const userName = user.value ? 
+        (user.value.displayName || user.value.email.split('@')[0]) : 
+        'there'
+      
+      chatResponse.value = `Hello, ${userName}! How are you today? I'm here to help you with your financial data. You can upload CSV files, ask questions about budgeting, or explore your transaction categories.`
+    }
+
     // Check backend health
     const checkBackend = async () => {
       try {
         const response = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
-        backendStatus.value = 'Connected ✅'
+        backendStatus.value = 'Connected'
         phase.value = response.data.phase || 'Phase 1'
         console.log('✅ Backend connected:', response.data)
       } catch (error) {
-        backendStatus.value = 'Disconnected ❌'
+        backendStatus.value = 'Disconnected'
         console.error('Backend connection failed:', error)
       }
     }
@@ -465,7 +453,7 @@ export default {
       } catch (error) {
         console.error('Chat request failed:', error)
         chatResponse.value = `Error: ${error.message}. Please check if the backend is running.`
-        chatInput.value = originalInput // Restore input on error
+        chatInput.value = originalInput
       }
     }
 
@@ -490,7 +478,6 @@ export default {
       Array.from(files).forEach((file, index) => {
         console.log('Processing file:', file.name)
         
-        // Add to recent uploads (mock for now)
         const upload = {
           id: Date.now() + index,
           filename: file.name,
@@ -501,7 +488,6 @@ export default {
         
         recentUploads.value.unshift(upload)
         
-        // Simulate processing
         setTimeout(() => {
           upload.status = 'success'
           transactionCount.value += upload.rows
@@ -514,16 +500,11 @@ export default {
       sendMessage('show me sample CSV format')
     }
 
-    const toggleChatHistory = () => {
-      showChatHistory.value = !showChatHistory.value
-    }
-
     const clearChatHistory = () => {
       chatHistory.value = []
-      chatResponse.value = ''
+      initializeWelcomeMessage()
     }
 
-    // Other functions
     const showTab = (tabName) => {
       currentTab.value = tabName
     }
@@ -554,7 +535,10 @@ export default {
       onAuthStateChanged(auth, (firebaseUser) => {
         user.value = firebaseUser
         console.log('Auth state changed:', firebaseUser ? firebaseUser.email : 'signed out')
+        initializeWelcomeMessage()
       })
+
+      initializeWelcomeMessage()
     })
 
     return {
@@ -565,7 +549,6 @@ export default {
       backendStatus,
       phase,
       showLoginModal,
-      showChatHistory,
       transactionCount,
       recentUploads,
       chatHistory,
@@ -578,7 +561,6 @@ export default {
       handleFileSelect,
       handleFileDrop,
       showSampleData,
-      toggleChatHistory,
       clearChatHistory
     }
   }
@@ -587,25 +569,4 @@ export default {
 
 <style>
 @import './assets/styles.css';
-
-/* Component-specific styles can be added here if needed */
-.chat-bar {
-    position: relative;
-}
-
-.file-drop-zone.dragover {
-    border-color: rgba(139, 69, 19, 0.6);
-    background: rgba(255, 255, 255, 0.4);
-    transform: scale(1.02);
-}
-
-.status-card.processing {
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.8; }
-    100% { opacity: 1; }
-}
 </style>
