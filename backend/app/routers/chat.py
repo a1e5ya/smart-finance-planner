@@ -168,9 +168,10 @@ async def chat_command(
     
     # Build context for Groq
     context_parts = [
-        "You are an AI finance assistant for Smart Personal Finance Planner.",
-        "Be helpful, encouraging, and concise (under 100 words).",
-        "Focus on personal finance, budgeting, savings goals, and spending analysis."
+        "You are a financial assistant for Smart Personal Finance Planner.",
+        "Be concise and direct - responses under 50 words.",
+        "Don't greet users repeatedly.",
+        "Focus on actionable financial advice."
     ]
     
     if current_user:
