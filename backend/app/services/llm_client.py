@@ -5,86 +5,159 @@ from typing import Dict, Optional, Any
 class HuggingFaceLLM:
     def __init__(self):
         self.api_key = os.getenv("HF_API_KEY")
-        self.model_id = os.getenv("HF_MODEL_ID", "gpt2")  # Changed to GPT-2
+        self.model_id = os.getenv("HF_MODEL_ID", "gpt2")
         self.base_url = "https://api-inference.huggingface.co/models"
         
-    async def query(self, prompt: str, max_tokens: int = 100) -> Dict[str, Any]:
-        """Query Hugging Face Inference API with GPT-2"""
+        # Debug logging
+        print(f"🔧 HF Client initialized:")
+        print(f"   API Key: {'✅ Set' if self.api_key else '❌ Missing'}")
+        print(f"   Model ID: {self.model_id}")
+        print(f"   Full URL: {self.base_url}/{self.model_id}")
+        
+    async def query(self, prompt: str, max_tokens: int = 50) -> Dict[str, Any]:
+        """Query Hugging Face Inference API with extensive debugging"""
+        
         if not self.api_key:
+            print("❌ No HF API key found")
             return {
                 "status": "error",
-                "text": "LLM service not configured",
-                "meta": {"fallback": True}
+                "text": "Hugging Face API key not configured",
+                "meta": {"fallback": True, "error": "no_api_key"}
             }
         
+        # Try a simpler approach first
         url = f"{self.base_url}/{self.model_id}"
-        headers = {"Authorization": f"Bearer {self.api_key}"}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
         
-        # GPT-2 format - simpler than Mistral's instruction format
-        # Add context to make responses more finance-focused
-        finance_context = "As a helpful personal finance assistant, respond to: "
-        formatted_prompt = f"{finance_context}{prompt}"
-        
+        # Simplified payload for debugging
         payload = {
-            "inputs": formatted_prompt,
+            "inputs": prompt,
             "parameters": {
                 "max_new_tokens": max_tokens,
                 "temperature": 0.7,
-                "return_full_text": False,  # Only return the generated part
-                "do_sample": True,
-                "top_p": 0.9,
-                "repetition_penalty": 1.1,  # Avoid repetitive text
-                "stop": ["\n\n", "User:", "Assistant:", "Question:"]  # Stop sequences
+                "return_full_text": False
             }
         }
         
+        print(f"🔍 Debug Info:")
+        print(f"   URL: {url}")
+        print(f"   Headers: {headers}")
+        print(f"   Payload: {payload}")
+        print(f"   Prompt length: {len(prompt)}")
+        
         try:
-            print(f"🤖 Querying GPT-2: {self.model_id}")
+            print(f"🚀 Making request to HF API...")
             response = requests.post(
                 url, 
                 headers=headers, 
                 json=payload, 
-                timeout=20
+                timeout=30
             )
             
-            print(f"HF API Status: {response.status_code}")
+            print(f"📊 Response Status: {response.status_code}")
+            print(f"📊 Response Headers: {dict(response.headers)}")
+            
+            # Log the raw response for debugging
+            try:
+                response_text = response.text
+                print(f"📊 Raw Response: {response_text[:500]}...")
+            except:
+                print("📊 Could not read response text")
             
             if response.status_code == 200:
-                result = response.json()
-                print(f"HF API Result Type: {type(result)}")
-                
-                # Handle different response formats
-                if isinstance(result, list) and len(result) > 0:
-                    generated_text = result[0].get("generated_text", "")
-                elif isinstance(result, dict) and "generated_text" in result:
-                    generated_text = result["generated_text"]
-                else:
-                    print(f"Unexpected response format: {result}")
+                try:
+                    result = response.json()
+                    print(f"✅ JSON Response Type: {type(result)}")
+                    print(f"✅ JSON Response Keys: {result.keys() if isinstance(result, dict) else 'List response'}")
+                    
+                    # Handle different response formats
+                    generated_text = ""
+                    if isinstance(result, list) and len(result) > 0:
+                        generated_text = result[0].get("generated_text", "")
+                    elif isinstance(result, dict) and "generated_text" in result:
+                        generated_text = result["generated_text"]
+                    else:
+                        print(f"❓ Unexpected response format: {result}")
+                        return {
+                            "status": "error",
+                            "text": "Unexpected API response format",
+                            "meta": {"fallback": True, "response": str(result)[:200]}
+                        }
+                    
+                    # Clean the response
+                    cleaned_text = generated_text.strip()
+                    if len(cleaned_text) > 200:
+                        cleaned_text = cleaned_text[:197] + "..."
+                    
+                    if not cleaned_text:
+                        cleaned_text = "I'm here to help with your finances!"
+                    
+                    print(f"✅ Final Response: {cleaned_text}")
+                    return {
+                        "status": "success",
+                        "text": cleaned_text,
+                        "meta": {"model": self.model_id, "length": len(cleaned_text)}
+                    }
+                    
+                except Exception as json_error:
+                    print(f"❌ JSON parsing error: {json_error}")
                     return {
                         "status": "error",
-                        "text": "Unexpected API response format",
-                        "meta": {"fallback": True}
+                        "text": "Failed to parse API response",
+                        "meta": {"fallback": True, "json_error": str(json_error)}
+                    }
+            
+            elif response.status_code == 401:
+                print("❌ Authentication failed - check your HF API key")
+                return {
+                    "status": "error",
+                    "text": "Hugging Face authentication failed",
+                    "meta": {"fallback": True, "status_code": 401}
+                }
+            
+            elif response.status_code == 404:
+                print(f"❌ Model not found: {self.model_id}")
+                print("💡 Trying fallback to a different model...")
+                
+                # Try with distilgpt2 as fallback
+                fallback_url = f"{self.base_url}/distilgpt2"
+                print(f"🔄 Trying fallback URL: {fallback_url}")
+                
+                fallback_response = requests.post(
+                    fallback_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=30
+                )
+                
+                if fallback_response.status_code == 200:
+                    print("✅ Fallback model worked!")
+                    result = fallback_response.json()
+                    generated_text = ""
+                    if isinstance(result, list) and len(result) > 0:
+                        generated_text = result[0].get("generated_text", "")
+                    
+                    cleaned_text = generated_text.strip()
+                    if len(cleaned_text) > 200:
+                        cleaned_text = cleaned_text[:197] + "..."
+                    
+                    return {
+                        "status": "success",
+                        "text": cleaned_text or "I'm here to help with your finances!",
+                        "meta": {"model": "distilgpt2", "fallback": True}
                     }
                 
-                # Clean the response
-                cleaned_text = generated_text.strip()
-                
-                # Post-process GPT-2 output to make it more concise and relevant
-                cleaned_text = self._post_process_gpt2_response(cleaned_text, prompt)
-                
-                if not cleaned_text:
-                    cleaned_text = "I'm here to help with your personal finances!"
-                
-                print(f"✅ GPT-2 Response: {cleaned_text[:100]}...")
                 return {
-                    "status": "success",
-                    "text": cleaned_text,
-                    "meta": {"model": self.model_id, "length": len(cleaned_text)}
+                    "status": "error",
+                    "text": f"Model '{self.model_id}' not found on Hugging Face",
+                    "meta": {"fallback": True, "status_code": 404}
                 }
             
             elif response.status_code == 503:
-                # Model is loading
-                print("⏳ GPT-2 model is loading...")
+                print("⏳ Model is loading...")
                 return {
                     "status": "error",
                     "text": "AI model is starting up, please try again in a moment...",
@@ -93,62 +166,47 @@ class HuggingFaceLLM:
             
             else:
                 error_text = response.text
-                print(f"❌ HF API Error {response.status_code}: {error_text}")
+                print(f"❌ HTTP Error {response.status_code}: {error_text}")
                 return {
                     "status": "error",
-                    "text": f"AI service temporarily unavailable ({response.status_code})",
-                    "meta": {"fallback": True, "status_code": response.status_code}
+                    "text": f"AI service error ({response.status_code})",
+                    "meta": {"fallback": True, "status_code": response.status_code, "error_text": error_text[:200]}
                 }
             
         except requests.exceptions.Timeout:
             print("⏰ Request timeout")
             return {
                 "status": "error", 
-                "text": "AI response took too long, please try again",
+                "text": "AI request timed out, please try again",
                 "meta": {"fallback": True, "timeout": True}
             }
+        except requests.exceptions.ConnectionError as e:
+            print(f"🌐 Connection error: {e}")
+            return {
+                "status": "error", 
+                "text": "Cannot connect to AI service",
+                "meta": {"fallback": True, "connection_error": str(e)}
+            }
         except Exception as e:
-            print(f"❌ Exception: {e}")
+            print(f"❌ Unexpected error: {e}")
             return {
                 "status": "error", 
                 "text": "AI service temporarily unavailable",
                 "meta": {"fallback": True, "error": str(e)}
             }
+
+# Test function to verify the API key and connection
+async def test_hugging_face_connection():
+    """Test function to debug HF API connection"""
+    client = HuggingFaceLLM()
     
-    def _post_process_gpt2_response(self, text: str, original_prompt: str) -> str:
-        """Post-process GPT-2 response to make it more suitable for chat"""
-        # Remove the context prefix if it appears in the response
-        text = text.replace("As a helpful personal finance assistant, respond to:", "").strip()
-        
-        # Split by sentences and take the first few that make sense
-        sentences = text.split('. ')
-        
-        # Filter out incomplete or very long sentences
-        good_sentences = []
-        for sentence in sentences[:3]:  # Take max 3 sentences
-            sentence = sentence.strip()
-            if len(sentence) > 10 and len(sentence) < 200:  # Reasonable length
-                if not sentence.endswith('.'):
-                    sentence += '.'
-                good_sentences.append(sentence)
-        
-        result = ' '.join(good_sentences)
-        
-        # If result is empty or too short, provide a default response
-        if len(result) < 20:
-            # Create a contextual fallback based on the prompt
-            if "goal" in original_prompt.lower() or "save" in original_prompt.lower():
-                result = "That's a great financial goal! I'd love to help you create a savings plan once you upload your transaction data."
-            elif "hello" in original_prompt.lower() or "hi" in original_prompt.lower():
-                result = "Hello! I'm your AI finance assistant, ready to help with budgeting and financial planning."
-            else:
-                result = "I'm here to help with your personal finances! Try asking about savings goals or uploading transaction data."
-        
-        # Ensure response is not too long
-        if len(result) > 300:
-            result = result[:297] + "..."
-        
-        return result
+    print("🧪 Testing Hugging Face API Connection...")
+    
+    # Test with a simple prompt
+    result = await client.query("Hello, I am a", max_tokens=10)
+    
+    print(f"🧪 Test Result: {result}")
+    return result
 
 # Initialize singleton
 llm_client = HuggingFaceLLM()
