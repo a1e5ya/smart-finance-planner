@@ -58,64 +58,95 @@
     <!-- Main Content -->
     <div class="main-content">
       <div class="content-area">
-        <!-- Dashboard Tab -->
+        <!-- Dashboard Tab - Transaction Import Focus -->
         <div v-if="currentTab === 'dashboard'" class="tab-content">
-          <div class="dashboard-grid">
-            <div class="kpi-card">
-              <h3>Authentication</h3>
-              <div class="value">{{ user ? '✅ Signed In' : '❌ Anonymous' }}</div>
-            </div>
-            <div class="kpi-card">
-              <h3>Backend Status</h3>
-              <div class="value">{{ backendStatus }}</div>
-            </div>
-            <div class="kpi-card">
-              <h3>Phase Progress</h3>
-              <div class="value">{{ phase }}</div>
-            </div>
-            <div class="kpi-card">
-              <h3>User</h3>
-              <div class="value">{{ user ? user.email.split('@')[0] : 'Guest' }}</div>
-            </div>
-          </div>
 
-          <div class="chart-section">
-            <div class="chart-title">Phase 1 Complete: Authentication + Chat Integration</div>
-            <div class="chart-placeholder">
-              <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
-              <strong>Working Features:</strong><br>
-              ✅ Firebase Authentication (Email/Password)<br>
-              ✅ Frontend ↔ Backend Auth Token Flow<br>
-              ✅ Personalized Chat Responses<br>
-              ✅ User Session Management<br>
-              <small style="margin-top: 12px; display: block;">
-                Backend Status: {{ backendStatus }} | User: {{ user ? user.email : 'Anonymous' }}
-              </small>
-            </div>
-          </div>
-
-          <!-- Quick Actions -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
-            <div class="placeholder-section">
-              <div class="placeholder-title">Test Authentication</div>
-              <div class="placeholder-text">
-                {{ user ? `Signed in as ${user.email}` : 'Sign in to test personalized features' }}
+          <!-- Import Status Cards -->
+          <div class="import-status-grid">
+            <div class="status-card">
+              <div class="status-icon">📥</div>
+              <div class="status-info">
+                <h3>Data Import</h3>
+                <div class="status-value">{{ transactionCount }} transactions</div>
+                <div class="status-detail">Ready to import CSV files</div>
               </div>
-              <button v-if="!user" class="placeholder-button" @click="showLoginModal = true">
-                Sign In / Sign Up
-              </button>
-              <button v-else class="placeholder-button" @click="sendMessage('test auth')">
-                Test Auth Flow
-              </button>
             </div>
             
-            <div class="placeholder-section">
-              <div class="placeholder-title">Try Smart Chat</div>
-              <div class="placeholder-text">Chat responses adapt based on your authentication status</div>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
-                <button class="placeholder-button" @click="sendMessage('hello')">Say Hello</button>
-                <button class="placeholder-button" @click="sendMessage('save 3000 for vacation')">Set Goal</button>
-                <button class="placeholder-button" @click="sendMessage('help')">Get Help</button>
+            <div class="status-card">
+              <div class="status-icon">👤</div>
+              <div class="status-info">
+                <h3>User Status</h3>
+                <div class="status-value">{{ user ? '✅ Signed In' : '❌ Anonymous' }}</div>
+                <div class="status-detail">{{ user ? user.email.split('@')[0] : 'Sign in to save data' }}</div>
+              </div>
+            </div>
+            
+            <div class="status-card">
+              <div class="status-icon">🔗</div>
+              <div class="status-info">
+                <h3>Connection</h3>
+                <div class="status-value">{{ backendStatus }}</div>
+                <div class="status-detail">Backend API ready</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Import Section -->
+          <div class="quick-import-section">
+            <div class="import-card">
+              <div class="import-header">
+                <h2>📁 Import Your Financial Data</h2>
+                <p>Upload CSV files from your bank or financial institution to get started</p>
+              </div>
+              
+              <div class="import-actions">
+                <div class="file-drop-zone" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
+                  <div class="drop-zone-content">
+                    <div class="upload-icon">📄</div>
+                    <h3>Drag & Drop CSV Files</h3>
+                    <p>Or click to browse and select files</p>
+                    <div class="supported-formats">
+                      <span>Supported: .csv, .xlsx</span>
+                    </div>
+                  </div>
+                  <input 
+                    ref="fileInput" 
+                    type="file" 
+                    accept=".csv,.xlsx" 
+                    multiple 
+                    @change="handleFileSelect" 
+                    style="display: none;"
+                  >
+                </div>
+                
+                <div class="import-options">
+                  <button class="import-btn primary" @click="triggerFileUpload">
+                    📥 Choose Files
+                  </button>
+                  <button class="import-btn secondary" @click="showSampleData">
+                    👁️ View Sample
+                  </button>
+                  <button class="import-btn secondary" @click="sendMessage('help import')">
+                    ❓ Import Help
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="recent-activity">
+            <h3>Recent Activity</h3>
+            <div class="activity-list">
+              <div v-if="recentUploads.length === 0" class="no-activity">
+                No recent imports. Upload your first CSV file to get started!
+              </div>
+              <div v-for="upload in recentUploads" :key="upload.id" class="activity-item">
+                <div class="activity-icon">{{ upload.status === 'success' ? '✅' : '⏳' }}</div>
+                <div class="activity-details">
+                  <div class="activity-title">{{ upload.filename }}</div>
+                  <div class="activity-meta">{{ upload.timestamp }} • {{ upload.rows }} rows</div>
+                </div>
               </div>
             </div>
           </div>
@@ -123,19 +154,32 @@
 
         <!-- Transactions Tab -->
         <div v-else-if="currentTab === 'transactions'" class="tab-content">
-          <div class="placeholder-section">
-            <div class="placeholder-title">Import Your Bank Data</div>
-            <div class="placeholder-text">
-              {{ user ? `Ready to import data for ${user.email.split('@')[0]}` : 'Sign in to save your imported data' }}
+          <div class="transactions-header">
+            <h2>💳 Transaction Management</h2>
+            <div class="transaction-stats">
+              <span>Total: {{ transactionCount }} transactions</span>
+              <span>•</span>
+              <span>User: {{ user ? user.email.split('@')[0] : 'Guest' }}</span>
             </div>
-            <button class="placeholder-button" @click="sendMessage('import transactions')">
-              Upload CSV File
-            </button>
           </div>
 
-          <div class="placeholder-section">
-            <div class="placeholder-title">Transaction Management</div>
-            <div class="placeholder-text">View, categorize, and analyze your transactions with ML-powered insights.</div>
+          <div class="transactions-content">
+            <div class="placeholder-section">
+              <div class="placeholder-title">Import & Manage Transactions</div>
+              <div class="placeholder-text">
+                Upload CSV files from your bank to automatically categorize and analyze your spending patterns.
+              </div>
+              <button class="placeholder-button" @click="showTab('dashboard')">
+                📥 Start Import
+              </button>
+            </div>
+
+            <div class="placeholder-section">
+              <div class="placeholder-title">Smart Categorization</div>
+              <div class="placeholder-text">
+                AI-powered transaction categorization with manual override capabilities.
+              </div>
+            </div>
           </div>
         </div>
 
@@ -143,7 +187,7 @@
         <div v-else-if="currentTab === 'categories'" class="tab-content">
           <div class="categories-layout">
             <div class="category-tree">
-              <h3 style="margin-bottom: 16px; color: rgba(139, 69, 19, 1); text-transform: uppercase; letter-spacing: 1px;">Category Hierarchy</h3>
+              <h3>Category Hierarchy</h3>
               <div class="category-item selected">🍽️ Food & Dining</div>
               <div class="category-item" style="padding-left: 32px;">🏪 Restaurants</div>
               <div class="category-item" style="padding-left: 32px;">🛒 Groceries</div>
@@ -156,8 +200,8 @@
             </div>
             
             <div class="category-details">
-              <h3 style="margin-bottom: 16px;">Smart Categorization</h3>
-              <p style="margin-bottom: 16px;">
+              <h3>Smart Categorization</h3>
+              <p>
                 {{ user ? `Personalized categories for ${user.email.split('@')[0]}` : 'Sign in to create custom categories' }}
               </p>
               
@@ -170,7 +214,7 @@
               <div class="chart-placeholder" style="height: 200px;">
                 📊<br>
                 Category Analytics<br>
-                <small>ML-powered transaction categorization</small>
+                <small>Import transactions to see category breakdown</small>
               </div>
             </div>
           </div>
@@ -190,15 +234,14 @@
           <div class="chart-placeholder" style="height: 400px; margin-bottom: 24px;">
             📈<br>
             Interactive Financial Timeline<br>
-            <small>Past transactions • Future forecasts • Goal tracking</small>
+            <small>Import transaction data to see your financial timeline</small>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
             <div class="placeholder-section">
               <div class="placeholder-title">Financial Goals</div>
               <div class="placeholder-text">
-                🎯 Vacation Fund: $1,200 / $3,000<br>
-                🏠 House Down Payment: $15,000 / $50,000
+                Set and track financial goals after importing your transaction data.
               </div>
             </div>
             
@@ -210,45 +253,75 @@
           </div>
         </div>
 
-        <!-- Settings Tab -->
+        <!-- Settings Tab - System Information Moved Here -->
         <div v-else-if="currentTab === 'settings'" class="tab-content">
           <div class="settings-layout">
             <div class="settings-main">
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
-                <div class="placeholder-section">
-                  <div class="placeholder-title">User Profile</div>
-                  <div class="placeholder-text">
-                    {{ user ? `Email: ${user.email}` : 'Not signed in' }}<br>
-                    {{ user ? `UID: ${user.uid.substring(0, 8)}...` : '' }}<br>
-                    Phase: 1 - Authentication Complete
+              <h2>⚙️ Settings & System Status</h2>
+              
+              <!-- System Status Section -->
+              <div class="settings-section">
+                <h3>🔧 System Status</h3>
+                <div class="system-indicators">
+                  <div class="system-card">
+                    <h4>Authentication</h4>
+                    <div class="value">{{ user ? '✅ Signed In' : '❌ Anonymous' }}</div>
+                    <div class="detail">{{ user ? user.email : 'Not authenticated' }}</div>
                   </div>
-                  <button v-if="!user" class="placeholder-button" @click="showLoginModal = true">
-                    Sign In
-                  </button>
-                </div>
-                
-                <div class="placeholder-section">
-                  <div class="placeholder-title">System Status</div>
-                  <div class="placeholder-text">
-                    Backend: {{ backendStatus }}<br>
-                    Database: Coming in Phase 2<br>
-                    ML Models: Coming in Phase 3
+                  <div class="system-card">
+                    <h4>Backend Status</h4>
+                    <div class="value">{{ backendStatus }}</div>
+                    <div class="detail">API Connection</div>
+                  </div>
+                  <div class="system-card">
+                    <h4>Phase Progress</h4>
+                    <div class="value">{{ phase }}</div>
+                    <div class="detail">Current Development Phase</div>
+                  </div>
+                  <div class="system-card">
+                    <h4>Database</h4>
+                    <div class="value">🔄 Phase 2</div>
+                    <div class="detail">Coming Soon</div>
                   </div>
                 </div>
-                
-                <div class="placeholder-section">
-                  <div class="placeholder-title">Data Management</div>
-                  <div class="placeholder-text">Export data, import historical files, backup settings</div>
-                  <button class="placeholder-button">Export All Data</button>
-                </div>
-                
-                <div class="placeholder-section">
-                  <div class="placeholder-title">Next Phase Preview</div>
-                  <div class="placeholder-text">
-                    🔜 Database Integration (NeonDB)<br>
-                    🔜 Audit Logging<br>
-                    🔜 Live Deployment
+              </div>
+
+              <!-- User Profile Section -->
+              <div class="settings-section">
+                <h3>👤 User Profile</h3>
+                <div class="user-profile">
+                  <div v-if="user" class="profile-info">
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>UID:</strong> {{ user.uid.substring(0, 16) }}...</p>
+                    <p><strong>Display Name:</strong> {{ user.displayName || 'Not set' }}</p>
+                    <button class="settings-button" @click="handleLogout">Sign Out</button>
                   </div>
+                  <div v-else class="profile-info">
+                    <p>Sign in to access personalized features and secure data storage.</p>
+                    <button class="settings-button" @click="showLoginModal = true">Sign In</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data Management Section -->
+              <div class="settings-section">
+                <h3>📊 Data Management</h3>
+                <div class="data-actions">
+                  <button class="settings-button">📥 Import Data</button>
+                  <button class="settings-button">📤 Export Data</button>
+                  <button class="settings-button">🗑️ Clear All Data</button>
+                  <button class="settings-button">🔄 Reset Categories</button>
+                </div>
+              </div>
+
+              <!-- Development Info -->
+              <div class="settings-section">
+                <h3>🔮 Next Phase Preview</h3>
+                <div class="phase-preview">
+                  <div class="preview-item">🔜 Database Integration (NeonDB)</div>
+                  <div class="preview-item">🔜 Transaction Table Storage</div>
+                  <div class="preview-item">🔜 Audit Logging</div>
+                  <div class="preview-item">🔜 CSV Import Processing</div>
                 </div>
               </div>
             </div>
@@ -264,17 +337,36 @@
       </div>
       
       <div class="chat-input-container">
-        <button class="expand-history">↑</button>
+        <button class="expand-history" @click="toggleChatHistory" :class="{ active: showChatHistory }">
+          {{ showChatHistory ? '↓' : '↑' }}
+        </button>
         <input 
           type="text" 
           class="chat-input" 
-          placeholder="Ask me anything! Try: 'hello', 'test auth', 'save 3000 for vacation'..."
+          placeholder="Ask me anything about importing transactions..."
           v-model="chatInput"
           @keypress.enter="sendMessage()"
         >
         <button class="send-button" @click="sendMessage()">
           ➤
         </button>
+      </div>
+
+      <!-- Chat History Panel -->
+      <div v-if="showChatHistory" class="chat-history">
+        <div class="chat-history-header">
+          <h4>Recent Conversations</h4>
+          <button @click="clearChatHistory" class="clear-history">Clear</button>
+        </div>
+        <div class="chat-history-items">
+          <div v-if="chatHistory.length === 0" class="no-history">
+            No conversation history yet. Start chatting to see your messages here!
+          </div>
+          <div v-for="(item, index) in chatHistory" :key="index" class="history-item">
+            <div class="history-message user">{{ item.message }}</div>
+            <div class="history-message bot">{{ item.response }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -284,13 +376,11 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { auth } from '@/firebase/config'
 import { onAuthStateChanged } from 'firebase/auth'
 import LoginModal from '@/components/LoginModal.vue'
-
-// Replace the setup() function in App.vue with this updated version:
 
 export default {
   name: 'App',
@@ -303,106 +393,137 @@ export default {
     const chatInput = ref('')
     const chatResponse = ref('')
     const backendStatus = ref('Checking...')
-    const phase = ref('1 - Auth Complete')
+    const phase = ref('1 - Transaction Import')
     const showLoginModal = ref(false)
+    const showChatHistory = ref(false)
+    const transactionCount = ref(0)
+    const recentUploads = ref([])
+    const chatHistory = ref([])
+    const fileInput = ref(null)
 
-    // Dynamic API base URL - uses environment variable in production
+    // Dynamic API base URL
     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'
-    
-    console.log('API_BASE:', API_BASE) // Debug log to verify correct URL
 
     // Check backend health
-const checkBackend = async () => {
-  try {
-    console.log('=== BACKEND DEBUG INFO ===')
-    console.log('API_BASE:', API_BASE)
-    console.log('Environment:', import.meta.env.MODE)
-    console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL)
-    console.log('Checking backend at:', `${API_BASE}/health`)
-    
-    const response = await axios.get(`${API_BASE}/health`, {
-      timeout: 10000 // 10 second timeout
-    })
-    
-    backendStatus.value = 'Connected ✅'
-    phase.value = response.data.phase || '1'
-    console.log('✅ Backend health check successful:', response.data)
-    
-  } catch (error) {
-    backendStatus.value = 'Disconnected ❌'
-    
-    console.log('=== ERROR DEBUG INFO ===')
-    console.error('Backend health check failed:', error)
-    console.error('Error type:', error.constructor.name)
-    console.error('Error message:', error.message)
-    console.error('Error code:', error.code)
-    
-    if (error.response) {
-      console.error('Response status:', error.response.status)
-      console.error('Response data:', error.response.data)
-      console.error('Response headers:', error.response.headers)
-    } else if (error.request) {
-      console.error('Request was made but no response received')
-      console.error('Request details:', error.request)
+    const checkBackend = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
+        backendStatus.value = 'Connected ✅'
+        phase.value = response.data.phase || 'Phase 1'
+        console.log('✅ Backend connected:', response.data)
+      } catch (error) {
+        backendStatus.value = 'Disconnected ❌'
+        console.error('Backend connection failed:', error)
+      }
     }
-    
-    console.error('Axios config:', error.config)
-    console.error('Attempted URL:', `${API_BASE}/health`)
-  }
-}
 
     // Send chat message with auth token
     const sendMessage = async (message = null) => {
       const messageText = message || chatInput.value.trim()
       if (!messageText) return
 
+      const originalInput = chatInput.value
       chatInput.value = ''
       chatResponse.value = 'Thinking...'
 
       try {
-        // Prepare headers with auth token
         let headers = {}
         if (user.value) {
           const token = await user.value.getIdToken()
           headers.Authorization = `Bearer ${token}`
         }
 
-        console.log('Sending message to:', `${API_BASE}/chat/command`)
         const response = await axios.post(`${API_BASE}/chat/command`, {
           message: messageText
-        }, { 
-          headers,
-          timeout: 15000 // 15 second timeout for chat
-        })
+        }, { headers, timeout: 15000 })
         
         chatResponse.value = response.data.response
         
+        // Add to chat history
+        chatHistory.value.unshift({
+          message: messageText,
+          response: response.data.response,
+          timestamp: new Date().toLocaleTimeString()
+        })
+        
+        // Keep only last 10 conversations
+        if (chatHistory.value.length > 10) {
+          chatHistory.value = chatHistory.value.slice(0, 10)
+        }
+        
         // Handle navigation commands
-        if (messageText.toLowerCase().includes('dashboard')) {
+        if (messageText.toLowerCase().includes('import') || messageText.toLowerCase().includes('upload')) {
           currentTab.value = 'dashboard'
-        } else if (messageText.toLowerCase().includes('import') || messageText.toLowerCase().includes('upload')) {
-          currentTab.value = 'transactions'
         } else if (messageText.toLowerCase().includes('categor')) {
           currentTab.value = 'categories'
         } else if (messageText.toLowerCase().includes('timeline')) {
           currentTab.value = 'timeline'
+        } else if (messageText.toLowerCase().includes('settings')) {
+          currentTab.value = 'settings'
         }
         
       } catch (error) {
         console.error('Chat request failed:', error)
-        if (error.code === 'ECONNABORTED') {
-          chatResponse.value = 'Request timed out. The server might be starting up - please try again in a moment.'
-        } else if (error.response) {
-          chatResponse.value = `Server error: ${error.response.status}. Please check if the backend is running.`
-        } else if (error.request) {
-          chatResponse.value = `Cannot reach the backend at ${API_BASE}. Please check the server status.`
-        } else {
-          chatResponse.value = 'An unexpected error occurred. Please try again.'
-        }
+        chatResponse.value = `Error: ${error.message}. Please check if the backend is running.`
+        chatInput.value = originalInput // Restore input on error
       }
     }
 
-    // Rest of your functions remain the same...
+    // File handling functions
+    const triggerFileUpload = () => {
+      fileInput.value?.click()
+    }
+
+    const handleFileSelect = (event) => {
+      const files = event.target.files
+      processFiles(files)
+    }
+
+    const handleFileDrop = (event) => {
+      const files = event.dataTransfer.files
+      processFiles(files)
+    }
+
+    const processFiles = (files) => {
+      if (!files || files.length === 0) return
+      
+      Array.from(files).forEach((file, index) => {
+        console.log('Processing file:', file.name)
+        
+        // Add to recent uploads (mock for now)
+        const upload = {
+          id: Date.now() + index,
+          filename: file.name,
+          status: 'processing',
+          rows: Math.floor(Math.random() * 1000) + 100,
+          timestamp: new Date().toLocaleTimeString()
+        }
+        
+        recentUploads.value.unshift(upload)
+        
+        // Simulate processing
+        setTimeout(() => {
+          upload.status = 'success'
+          transactionCount.value += upload.rows
+          chatResponse.value = `Successfully processed ${file.name} with ${upload.rows} transactions!`
+        }, 2000)
+      })
+    }
+
+    const showSampleData = () => {
+      sendMessage('show me sample CSV format')
+    }
+
+    const toggleChatHistory = () => {
+      showChatHistory.value = !showChatHistory.value
+    }
+
+    const clearChatHistory = () => {
+      chatHistory.value = []
+      chatResponse.value = ''
+    }
+
+    // Other functions
     const showTab = (tabName) => {
       currentTab.value = tabName
     }
@@ -417,7 +538,7 @@ const checkBackend = async () => {
       if (user.value) {
         try {
           await auth.signOut()
-          chatResponse.value = "You've been signed out. Your session data is cleared. Sign in again for personalized features!"
+          chatResponse.value = "You've been signed out. Sign in again for personalized features!"
         } catch (error) {
           console.error('Logout error:', error)
         }
@@ -426,19 +547,14 @@ const checkBackend = async () => {
       }
     }
 
-    // Initialize Firebase auth listener
+    // Initialize
     onMounted(() => {
       checkBackend()
       
-      // Firebase auth state listener
       onAuthStateChanged(auth, (firebaseUser) => {
         user.value = firebaseUser
         console.log('Auth state changed:', firebaseUser ? firebaseUser.email : 'signed out')
       })
-
-      setTimeout(() => {
-        chatResponse.value = `🎉 Phase 1 Complete! Authentication system working. Backend: ${API_BASE}`
-      }, 2000)
     })
 
     return {
@@ -449,10 +565,21 @@ const checkBackend = async () => {
       backendStatus,
       phase,
       showLoginModal,
+      showChatHistory,
+      transactionCount,
+      recentUploads,
+      chatHistory,
+      fileInput,
       sendMessage,
       showTab,
       handleUserClick,
-      handleLogout
+      handleLogout,
+      triggerFileUpload,
+      handleFileSelect,
+      handleFileDrop,
+      showSampleData,
+      toggleChatHistory,
+      clearChatHistory
     }
   }
 }
@@ -461,91 +588,24 @@ const checkBackend = async () => {
 <style>
 @import './assets/styles.css';
 
-.settings-layout {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
+/* Component-specific styles can be added here if needed */
+.chat-bar {
+    position: relative;
 }
 
-.categories-layout {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    gap: 16px;
-}
-
-.category-tree {
-    backdrop-filter: blur(20px);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.25));
-    border-radius: 20px;
-    padding: 16px;
-    box-shadow: 0 10px 25px rgba(139, 69, 19, 0.1), 0 5px 12px rgba(139, 69, 19, 0.06);
-}
-
-.category-item {
-    padding: 8px 12px;
-    margin: 3px 0;
-    border-radius: 14px;
-    cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    color: rgba(40, 25, 22, 0.9);
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-}
-
-.category-item:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-.category-item.selected {
-    background: linear-gradient(135deg, #8b4513, #a0522d);
-    color: white;
-    box-shadow: 0 6px 15px rgba(139, 69, 19, 0.25);
-}
-
-.category-details {
-    backdrop-filter: blur(20px);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.25));
-    border-radius: 20px;
-    padding: 20px;
-    box-shadow: 0 10px 25px rgba(139, 69, 19, 0.1), 0 5px 12px rgba(139, 69, 19, 0.06);
-}
-
-.timeline-controls {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
-    align-items: center;
-}
-
-.timeline-control {
-    padding: 8px 14px;
-    backdrop-filter: blur(20px);
+.file-drop-zone.dragover {
+    border-color: rgba(139, 69, 19, 0.6);
     background: rgba(255, 255, 255, 0.4);
-    border: none;
-    border-radius: 16px;
-    cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    color: rgba(139, 69, 19, 0.8);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    font-size: 12px;
+    transform: scale(1.02);
 }
 
-.timeline-control:hover {
-    background: rgba(255, 255, 255, 0.6);
+.status-card.processing {
+    animation: pulse 2s infinite;
 }
 
-.timeline-control.active {
-    background: linear-gradient(135deg, #8b4513, #a0522d);
-    color: white;
-    box-shadow: 0 6px 15px rgba(139, 69, 19, 0.25);
-}
-
-@media (max-width: 1200px) {
-    .categories-layout {
-        grid-template-columns: 1fr;
-    }
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
 }
 </style>
