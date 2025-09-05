@@ -98,102 +98,65 @@ def get_smart_fallback_response(message: str, user: Optional[User]) -> str:
     message_lower = message.lower()
     user_name = user.display_name or user.email.split('@')[0] if user else "there"
     
-    # Check for financial intents first
+    # Check for financial intents
     financial_intent = parse_financial_intent(message)
     if financial_intent:
         if financial_intent["type"] == "savings_goal":
-            return f"Great goal, {user_name}! Saving ${financial_intent['amount']} for {financial_intent['purpose']} by {financial_intent['deadline']} is achievable with the right plan. Upload your transaction data and I'll help you create a realistic savings strategy!"
+            return f"I can see you want to save ${financial_intent['amount']} for {financial_intent['purpose']} by {financial_intent['deadline']}! That's a great goal, {user_name}. Once you upload your transaction data, I'll help you create a realistic savings plan and track your progress."
         elif financial_intent["type"] == "budget":
-            return f"Setting a ${financial_intent['amount']} budget for {financial_intent['category']} is smart planning! Once you upload your transaction history, I can analyze if this budget aligns with your spending patterns."
+            return f"Setting a ${financial_intent['amount']} budget for {financial_intent['category']} is smart planning! Upload your transaction history and I'll help you see if this budget is realistic based on your spending patterns."
     
     # AI/Language model questions
     if any(phrase in message_lower for phrase in ["language model", "ai", "artificial intelligence", "what are you", "who are you"]):
-        return f"I'm your AI finance assistant powered by GPT-2! I help with budgeting, savings goals, and financial planning. I'm currently in Phase 1 with authentication working. Upload your transaction data to unlock my full potential, {user_name}!"
+        return f"I'm an AI assistant powered by Google's FLAN-T5, specifically designed for personal finance! I can help with budgeting, savings goals, and financial planning. Right now I'm in Phase 1, so I can chat with you, but I'll be much more powerful once you upload your transaction data, {user_name}!"
     
     # Greetings
     if any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good afternoon"]):
         if user:
-            return f"Hello {user_name}! 👋 I'm your AI finance assistant. Your authentication is working perfectly! Ready to help with budgeting and savings goals. Try asking me to help you save money or upload your transaction CSV!"
+            return f"Hello {user_name}! I'm your AI finance assistant powered by FLAN-T5. I'm ready to help with budgeting and savings goals. Upload your transaction CSV to unlock my full potential!"
         else:
-            return "Hello! 👋 I'm your AI finance assistant. Sign in to access personalized features, then upload your transaction data to get started with smart financial planning!"
+            return "Hello! I'm your AI finance assistant powered by Google's FLAN-T5. Sign in to access personalized features, then upload your transaction data to get started with smart financial planning!"
     
-    # Data import questions
-    if any(word in message_lower for word in ["import", "upload", "csv", "transactions", "bank data", "file"]):
-        return f"To import your financial data, {user_name}, click 'Upload CSV File' in the Transactions tab. I support most bank CSV formats and will automatically categorize your spending once that feature is ready in Phase 2!"
+    # Data import
+    elif any(word in message_lower for word in ["import", "upload", "csv", "transactions", "bank data"]):
+        return f"To import your financial data, {user_name}, click 'Upload CSV File' in the Transactions tab. I support most bank CSV formats and will automatically categorize your spending once the feature is ready!"
     
-    # Financial analysis questions
-    if any(word in message_lower for word in ["balance", "money", "spend", "spending", "analyze", "budget"]):
+    # Financial analysis
+    elif any(word in message_lower for word in ["balance", "money", "spend", "spending", "analyze", "budget"]):
         return f"I'd love to analyze your finances, {user_name}! First, upload your transaction CSV in the Transactions tab, then I can provide insights on spending patterns, suggest budgets, and help with financial planning."
     
     # Help and capabilities
-    if any(word in message_lower for word in ["help", "what can", "capabilities", "features"]):
+    elif any(word in message_lower for word in ["help", "what can", "capabilities", "features"]):
         if user:
-            return f"Hi {user_name}! I'm your GPT-2 powered finance assistant. ✨ Current features: ✅ Authentication ✅ Personalized chat ✅ Goal parsing. Coming soon: 🔜 Transaction import 🔜 ML categorization 🔜 Prophet forecasting. Try: 'Save $3000 by December' or 'Help me budget'!"
+            return f"Hi {user_name}! I'm your AI-powered finance assistant using Google's FLAN-T5 model. I can help with savings goals, budgeting, and financial planning. Currently in Phase 1 - upload your bank CSV to unlock features like spending analysis and goal tracking!"
         else:
-            return "I'm a GPT-2 powered finance assistant! 🤖 Sign in first, then upload transaction data for personalized insights. Try asking: 'Save $3000 by December' or 'Help me budget for groceries'."
+            return "I'm an AI finance assistant powered by FLAN-T5! Sign in first, then upload transaction data for personalized insights. Try asking: 'Save $3000 by December' or 'Help me budget for groceries'."
     
-    # Authentication testing
-    if any(word in message_lower for word in ["auth", "login", "sign in", "account", "test auth"]):
+    # Authentication
+    elif any(word in message_lower for word in ["auth", "login", "sign in", "account"]):
         if user:
-            return f"🎉 Authentication test successful! You're signed in as {user.email}. Your Firebase token is working perfectly with the backend. All systems ready for Phase 2 features!"
+            return f"You're successfully signed in as {user.email}! Your authentication is working perfectly. Now upload some transaction data and I can provide personalized financial insights!"
         else:
-            return "❌ Not authenticated. Please sign in using the login button to test personalized features and secure data storage!"
-    
-    # System status questions
-    if any(word in message_lower for word in ["status", "working", "online", "backend", "server"]):
-        return f"✅ System Status: Backend online, GPT-2 AI active, authentication working! {f'Signed in as {user_name}' if user else 'Anonymous user'}. Phase 1 complete - ready for transaction imports in Phase 2!"
+            return "Please sign in using the login button to access personalized financial features and secure data storage!"
     
     # Forecasting and predictions
-    if any(word in message_lower for word in ["forecast", "predict", "future", "will i", "can i afford"]):
-        return f"I'll be able to forecast your spending and predict financial outcomes using Prophet ML once you upload transaction data, {user_name}! The forecasting engine will help you plan for the future with confidence."
+    elif any(word in message_lower for word in ["forecast", "predict", "future", "will i", "can i afford"]):
+        return f"I'll be able to forecast your spending and predict financial outcomes once you upload transaction data, {user_name}! The forecasting engine uses machine learning to help you plan for the future."
     
     # Categories and organization
-    if any(word in message_lower for word in ["categor", "organize", "sort", "group"]):
-        return f"I can automatically categorize your transactions using machine learning once you upload your data, {user_name}! The system learns from your spending patterns to organize everything intelligently."
+    elif any(word in message_lower for word in ["categor", "organize", "sort", "group"]):
+        return f"I can automatically categorize your transactions using ML once you upload your data, {user_name}! The system learns from your spending patterns to organize everything intelligently."
     
-    # Short responses for simple inputs
-    if len(message_lower.strip()) <= 3:
-        if message_lower in ["y", "yes", "ok", "k"]:
-            return f"Great! What would you like to work on, {user_name}? Try: 'Save money for vacation' or 'Help me budget' or 'Import transactions'."
-        elif message_lower in ["n", "no"]:
-            return f"No problem, {user_name}! Is there something else I can help you with? I'm here for budgeting, savings goals, and financial planning!"
+    # Test messages
+    elif any(word in message_lower for word in ["test", "check"]):
+        if user:
+            return f"✅ Test successful! I'm working great, {user_name}. You're authenticated as {user.email} and I'm powered by Google's FLAN-T5 model. Ready to help with your finances!"
+        else:
+            return "✅ Test successful! I'm working well. You're browsing anonymously - sign in for personalized features and secure data storage!"
     
-    # Default response with more personality
-    return f"I understand you said '{message}'. I'm your GPT-2 powered finance assistant ready to help with budgeting, savings goals, and financial planning! ✨ Try asking me to help you save money or upload your transaction data in the Transactions tab, {user_name}."
-
-def build_gpt2_prompt(message: str, user: Optional[User]) -> str:
-    """Build a well-structured prompt for GPT-2 to generate finance-focused responses"""
-    
-    # User context
-    user_context = ""
-    if user:
-        user_name = user.display_name or user.email.split('@')[0]
-        user_context = f"The user {user_name} is signed in and authenticated. "
+    # Default response
     else:
-        user_context = "The user is anonymous and should be encouraged to sign in. "
-    
-    # Check for specific financial intents
-    financial_intent = parse_financial_intent(message)
-    intent_context = ""
-    
-    if financial_intent:
-        if financial_intent["type"] == "savings_goal":
-            intent_context = f"The user wants to save ${financial_intent['amount']} for {financial_intent['purpose']} by {financial_intent['deadline']}. "
-        elif financial_intent["type"] == "budget":
-            intent_context = f"The user wants to budget ${financial_intent['amount']} for {financial_intent['category']}. "
-    
-    # Build the complete prompt
-    prompt = f"""You are a helpful personal finance assistant. {user_context}{intent_context}Respond to the user's message: "{message}"
-
-Keep your response:
-- Under 100 words
-- Friendly and encouraging
-- Focused on personal finance
-- Practical and actionable
-
-Response:"""
-    
-    return prompt
+        return f"I understand you said '{message}'. I'm an AI finance assistant powered by FLAN-T5, ready to help with budgeting, savings goals, and financial planning! Try uploading your transaction data in the Transactions tab to get started, {user_name}."
 
 @router.post("/command", response_model=ChatResponse)
 async def chat_command(
@@ -202,29 +165,46 @@ async def chat_command(
     current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """GPT-2 powered chat with intelligent fallbacks"""
+    """FLAN-T5 powered chat with intelligent fallbacks"""
     
-    message = request_data.message.strip()
+    message = request_data.message
     user_context = "authenticated" if current_user else "anonymous"
     ai_powered = False
     fallback_used = False
     model_info = None
     
-    # Build GPT-2 specific prompt
-    gpt2_prompt = build_gpt2_prompt(message, current_user)
+    # Build FLAN-T5 specific context - simpler and more direct
+    context_parts = [
+        "You are a helpful AI finance assistant for Smart Personal Finance Planner.",
+        "Be helpful, encouraging, and concise (under 80 words).",
+        "Focus on personal finance, budgeting, savings goals, and spending analysis."
+    ]
     
-    print(f"🎯 Attempting GPT-2 query for: {message}")
+    if current_user:
+        context_parts.append(f"The user {current_user.email} is signed in.")
+    else:
+        context_parts.append("The user is anonymous - encourage them to sign in for personalized features.")
     
-    # Try GPT-2 first
+    context_parts.extend([
+        "This is Phase 1: authentication works, transaction import coming soon.",
+        "If asked about unimplemented features, guide to current capabilities.",
+        f"Question: {message}"
+    ])
+    
+    # FLAN-T5 works better with clear, direct prompts
+    full_prompt = " ".join(context_parts)
+    
+    # Try FLAN-T5 LLM first
+    print(f"🎯 Attempting FLAN-T5 query for: {message}")
     try:
-        llm_result = await llm_client.query(gpt2_prompt, max_tokens=80)
-        print(f"📊 GPT-2 result: {llm_result['status']}")
+        llm_result = await llm_client.query(full_prompt, max_tokens=120)
+        print(f"📊 FLAN-T5 result: {llm_result['status']}")
         
         if llm_result["status"] == "success" and llm_result["text"]:
             response = llm_result["text"]
             ai_powered = True
-            model_info = llm_result.get("meta", {}).get("model", "gpt2")
-            print(f"✅ Using GPT-2 AI response")
+            model_info = llm_result.get("meta", {}).get("model", "google/flan-t5-large")
+            print(f"✅ Using FLAN-T5 AI response")
         else:
             response = get_smart_fallback_response(message, current_user)
             fallback_used = True
@@ -232,7 +212,7 @@ async def chat_command(
             print(f"🔄 Using enhanced fallback: {llm_result.get('text', 'unknown error')}")
             
     except Exception as e:
-        print(f"❌ GPT-2 error: {e}")
+        print(f"❌ FLAN-T5 error: {e}")
         response = get_smart_fallback_response(message, current_user)
         fallback_used = True
         model_info = "fallback"
@@ -271,5 +251,5 @@ async def get_chat_history(
     return {
         "message": f"Chat history for {current_user.email} - coming in Phase 2!",
         "user_id": str(current_user.id),
-        "ai_model": "gpt2"
+        "ai_model": "google/flan-t5-large"
     }
