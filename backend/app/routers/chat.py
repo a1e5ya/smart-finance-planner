@@ -7,7 +7,7 @@ import re
 
 from ..models.database import get_db, User, AuditLog
 from .auth import get_current_user
-from ..services.llm_client import llm_client
+from ..services.groq_client import llm_client  # Updated import
 
 router = APIRouter()
 
@@ -108,14 +108,14 @@ def get_smart_fallback_response(message: str, user: Optional[User]) -> str:
     
     # AI/Language model questions
     if any(phrase in message_lower for phrase in ["language model", "ai", "artificial intelligence", "what are you", "who are you"]):
-        return f"I'm an AI assistant powered by Google's FLAN-T5, specifically designed for personal finance! I can help with budgeting, savings goals, and financial planning. Right now I'm in Phase 1, so I can chat with you, but I'll be much more powerful once you upload your transaction data, {user_name}!"
+        return f"I'm an AI assistant powered by Groq's Llama models, specifically designed for personal finance! I can help with budgeting, savings goals, and financial planning. Right now I'm in Phase 1, so I can chat with you, but I'll be much more powerful once you upload your transaction data, {user_name}!"
     
     # Greetings
     if any(word in message_lower for word in ["hello", "hi", "hey", "good morning", "good afternoon"]):
         if user:
-            return f"Hello {user_name}! I'm your AI finance assistant powered by FLAN-T5. I'm ready to help with budgeting and savings goals. Upload your transaction CSV to unlock my full potential!"
+            return f"Hello {user_name}! I'm your AI finance assistant powered by Groq. I'm ready to help with budgeting and savings goals. Upload your transaction CSV to unlock my full potential!"
         else:
-            return "Hello! I'm your AI finance assistant powered by Google's FLAN-T5. Sign in to access personalized features, then upload your transaction data to get started with smart financial planning!"
+            return "Hello! I'm your AI finance assistant powered by Groq's fast language models. Sign in to access personalized features, then upload your transaction data to get started with smart financial planning!"
     
     # Data import
     elif any(word in message_lower for word in ["import", "upload", "csv", "transactions", "bank data"]):
@@ -128,9 +128,9 @@ def get_smart_fallback_response(message: str, user: Optional[User]) -> str:
     # Help and capabilities
     elif any(word in message_lower for word in ["help", "what can", "capabilities", "features"]):
         if user:
-            return f"Hi {user_name}! I'm your AI-powered finance assistant using Google's FLAN-T5 model. I can help with savings goals, budgeting, and financial planning. Currently in Phase 1 - upload your bank CSV to unlock features like spending analysis and goal tracking!"
+            return f"Hi {user_name}! I'm your AI-powered finance assistant running on Groq for super-fast responses. I can help with savings goals, budgeting, and financial planning. Currently in Phase 1 - upload your bank CSV to unlock features like spending analysis and goal tracking!"
         else:
-            return "I'm an AI finance assistant powered by FLAN-T5! Sign in first, then upload transaction data for personalized insights. Try asking: 'Save $3000 by December' or 'Help me budget for groceries'."
+            return "I'm an AI finance assistant powered by Groq's lightning-fast language models! Sign in first, then upload transaction data for personalized insights. Try asking: 'Save $3000 by December' or 'Help me budget for groceries'."
     
     # Authentication
     elif any(word in message_lower for word in ["auth", "login", "sign in", "account"]):
@@ -147,16 +147,9 @@ def get_smart_fallback_response(message: str, user: Optional[User]) -> str:
     elif any(word in message_lower for word in ["categor", "organize", "sort", "group"]):
         return f"I can automatically categorize your transactions using ML once you upload your data, {user_name}! The system learns from your spending patterns to organize everything intelligently."
     
-    # Test messages
-    elif any(word in message_lower for word in ["test", "check"]):
-        if user:
-            return f"✅ Test successful! I'm working great, {user_name}. You're authenticated as {user.email} and I'm powered by Google's FLAN-T5 model. Ready to help with your finances!"
-        else:
-            return "✅ Test successful! I'm working well. You're browsing anonymously - sign in for personalized features and secure data storage!"
-    
     # Default response
     else:
-        return f"I understand you said '{message}'. I'm an AI finance assistant powered by FLAN-T5, ready to help with budgeting, savings goals, and financial planning! Try uploading your transaction data in the Transactions tab to get started, {user_name}."
+        return f"I understand you said '{message}'. I'm an AI finance assistant powered by Groq's fast language models, ready to help with budgeting, savings goals, and financial planning! Try uploading your transaction data in the Transactions tab to get started, {user_name}."
 
 @router.post("/command", response_model=ChatResponse)
 async def chat_command(
@@ -165,7 +158,7 @@ async def chat_command(
     current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """FLAN-T5 powered chat with intelligent fallbacks"""
+    """Groq-powered chat with intelligent fallbacks"""
     
     message = request_data.message
     user_context = "authenticated" if current_user else "anonymous"
@@ -173,38 +166,37 @@ async def chat_command(
     fallback_used = False
     model_info = None
     
-    # Build FLAN-T5 specific context - simpler and more direct
+    # Build context for Groq
     context_parts = [
-        "You are a helpful AI finance assistant for Smart Personal Finance Planner.",
-        "Be helpful, encouraging, and concise (under 80 words).",
+        "You are an AI finance assistant for Smart Personal Finance Planner.",
+        "Be helpful, encouraging, and concise (under 100 words).",
         "Focus on personal finance, budgeting, savings goals, and spending analysis."
     ]
     
     if current_user:
-        context_parts.append(f"The user {current_user.email} is signed in.")
+        context_parts.append(f"User {current_user.email} is signed in.")
     else:
-        context_parts.append("The user is anonymous - encourage them to sign in for personalized features.")
+        context_parts.append("User is anonymous - encourage sign in for personalized features.")
     
     context_parts.extend([
-        "This is Phase 1: authentication works, transaction import coming soon.",
+        "This is Phase 1: auth works, transaction import coming soon.",
         "If asked about unimplemented features, guide to current capabilities.",
-        f"Question: {message}"
+        f"User question: {message}"
     ])
     
-    # FLAN-T5 works better with clear, direct prompts
     full_prompt = " ".join(context_parts)
     
-    # Try FLAN-T5 LLM first
-    print(f"🎯 Attempting FLAN-T5 query for: {message}")
+    # Try Groq LLM first
+    print(f"🎯 Attempting Groq query for: {message}")
     try:
-        llm_result = await llm_client.query(full_prompt, max_tokens=120)
-        print(f"📊 FLAN-T5 result: {llm_result['status']}")
+        llm_result = await llm_client.query(full_prompt, max_tokens=150)
+        print(f"📊 Groq result: {llm_result['status']}")
         
         if llm_result["status"] == "success" and llm_result["text"]:
             response = llm_result["text"]
             ai_powered = True
-            model_info = llm_result.get("meta", {}).get("model", "google/flan-t5-base")
-            print(f"✅ Using FLAN-T5 AI response")
+            model_info = llm_result.get("meta", {}).get("model", "groq")
+            print(f"✅ Using Groq AI response")
         else:
             response = get_smart_fallback_response(message, current_user)
             fallback_used = True
@@ -212,7 +204,7 @@ async def chat_command(
             print(f"🔄 Using enhanced fallback: {llm_result.get('text', 'unknown error')}")
             
     except Exception as e:
-        print(f"❌ FLAN-T5 error: {e}")
+        print(f"❌ Groq error: {e}")
         response = get_smart_fallback_response(message, current_user)
         fallback_used = True
         model_info = "fallback"
@@ -251,5 +243,5 @@ async def get_chat_history(
     return {
         "message": f"Chat history for {current_user.email} - coming in Phase 2!",
         "user_id": str(current_user.id),
-        "ai_model": "google/flan-t5-base"
+        "ai_model": "groq-llama-models"
     }
