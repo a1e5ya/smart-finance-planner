@@ -6,7 +6,7 @@ class HuggingFaceLLM:
     def __init__(self):
         self.api_key = os.getenv("HF_API_KEY")
         # Updated to use google/flan-t5-large model
-        self.model_id = os.getenv("HF_MODEL_ID", "google/flan-t5-large")
+        self.model_id = os.getenv("HF_MODEL_ID", "google/flan-t5-base")
         self.base_url = "https://api-inference.huggingface.co/models"
         
     async def query(self, prompt: str, max_tokens: int = 200) -> Dict[str, Any]:

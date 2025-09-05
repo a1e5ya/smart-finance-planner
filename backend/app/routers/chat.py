@@ -203,7 +203,7 @@ async def chat_command(
         if llm_result["status"] == "success" and llm_result["text"]:
             response = llm_result["text"]
             ai_powered = True
-            model_info = llm_result.get("meta", {}).get("model", "google/flan-t5-large")
+            model_info = llm_result.get("meta", {}).get("model", "google/flan-t5-base")
             print(f"✅ Using FLAN-T5 AI response")
         else:
             response = get_smart_fallback_response(message, current_user)
@@ -251,5 +251,5 @@ async def get_chat_history(
     return {
         "message": f"Chat history for {current_user.email} - coming in Phase 2!",
         "user_id": str(current_user.id),
-        "ai_model": "google/flan-t5-large"
+        "ai_model": "google/flan-t5-base"
     }
