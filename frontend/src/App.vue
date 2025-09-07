@@ -1,13 +1,13 @@
 <template>
   <div id="app">
-    <!-- Top Bar -->
+    <!-- Top Bar with Custom Icons -->
     <div class="top-bar">
-      <button 
-        class="btn btn-active"
-        @click="showTab('dashboard')"
-      >
-        <span class="text-medium">Financial Dashboard</span>
-      </button>
+<button 
+  class="btn btn-active museo-dashboard"
+  @click="showTab('dashboard')"
+>
+  <span class="text-medium">azimuth</span>
+</button>
       
       <div class="flex flex-gap">
         <button 
@@ -36,11 +36,11 @@
       <div class="flex flex-center flex-gap">
         <button 
           class="btn btn-icon"
-          :class="{ 'btn-active': currentTab === 'settings' }"
+          :class="{ 'btn-active': currentTab === 'settings-sliders' }"
           @click="showTab('settings')" 
           title="Settings"
         >
-          ⚙️
+          <AppIcon name="settings-sliders" size="medium" />
         </button>
         <span class="text-medium" @click="handleUserClick">
           {{ user ? (user.displayName || user.email.split('@')[0]) : 'Sign In' }}
@@ -50,7 +50,7 @@
           @click="handleLogout" 
           :title="user ? 'Logout' : 'Sign In'"
         >
-          {{ user ? '🚪' : '👤' }}
+          <AppIcon :name="user ? 'sign-out' : 'login'" size="medium" />
         </button>
       </div>
     </div>
@@ -98,12 +98,12 @@
               <div class="text-medium text-light">Upload CSV files from your bank or financial institution to get started</div>
             </div>
             
-            <div class="drop-zone" @click="triggerFileUpload" @dragover.prevent @drop.prevent="handleFileDrop">
-              <div class="flex-column flex-center flex-gap">
-                <div class="text-large">Drag & Drop CSV Files</div>
-                <div class="text-medium text-light">Or click to browse and select files</div>
-                <div class="text-small text-muted">Supported: .csv, .xlsx</div>
-              </div>
+    <div class="drop-zone" @click="triggerFileUpload">
+      <div class="flex-column flex-center flex-gap">
+        <AppIcon name="upload" size="large" />
+        <div class="text-large">Drag & Drop CSV Files</div>
+        <div class="text-medium text-light">Or click to browse and select files</div>
+      </div>
               <input 
                 ref="fileInput" 
                 type="file" 
@@ -361,10 +361,12 @@ import axios from 'axios'
 import { auth } from '@/firebase/config'
 import { onAuthStateChanged } from 'firebase/auth'
 import LoginModal from '@/components/LoginModal.vue'
+import AppIcon from '@/components/AppIcon.vue'
 
 export default {
   name: 'App',
   components: {
+    AppIcon,
     LoginModal
   },
   setup() {
