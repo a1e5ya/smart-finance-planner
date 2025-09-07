@@ -180,7 +180,7 @@ button * {
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: var(--shadow);
-  margin: var(--gap-standard);
+  margin: var(--gap-standard) 0;
   display: inline-block;
   white-space: nowrap;
 }
@@ -216,7 +216,40 @@ button * {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: var(--gap-standard);
+}
+
+.btn-active .icon-wrapper :deep(svg),
+.btn-active .icon-wrapper :deep(svg *) {
+  fill: white !important;
+}
+
+/* ==============================================
+   LINK BUTTON CLASS - SIMPLE & CLEAN
+   ============================================== */
+
+.btn-link {
+margin: 0;
+  background: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  color: var(--color-text-light);
+  font-weight: 400;
+}
+
+.btn-link:hover {
+  background: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: var(--color-text);
+}
+
+.btn-link.btn-active {
+  background: none !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 600;
+  font-family: "MuseoModerno", sans-serif !important;
+  font-style: italic !important;
 }
 
 /* ==============================================
@@ -241,10 +274,17 @@ button * {
 .main-content {
   flex: 1;
   padding: var(--gap-standard);
+  padding-bottom: 4rem;
   margin: 0 auto;
   width: 100%;
   overflow-y: auto;
   min-height: 0;
+  max-height: calc(100vh - var(--topbar-height) - 4rem);
+}
+
+.main-content.chat-open {
+  padding-bottom: 50vh; /* Space for expanded chat */
+  max-height: calc(100vh - var(--topbar-height) - 50vh);
 }
 
 
@@ -347,25 +387,116 @@ button * {
    CHAT BAR - IMPROVED LAYOUT
    ============================================== */
 
-.chat-bar {
+.chat-bar-always {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   backdrop-filter: blur(1.5rem);
   background: var(--color-background-light);
-  padding: var(--gap-standard);
   box-shadow: var(--shadow);
   z-index: 50;
   display: flex;
   flex-direction: column;
-  gap: var(--gap-small);
-  max-height: 50vh; /* Don't take up more than half screen */
+  max-height: 50vh;
 }
 
-.chat-input {
+.welcome-message {
+  padding: var(--gap-standard);
+  background: var(--color-background);
+  color: var(--color-text);
+  line-height: 1.4;
+  word-wrap: break-word;
+  font-family: "Livvic", sans-serif;
+  font-style: italic;
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin: var(--gap-standard) var(--gap-standard) 0;
+}
+
+.chat-history-simple {
   flex: 1;
+  overflow-y: auto;
+  max-height: 35vh;
+}
+
+.chat-messages-simple {
+  padding: var(--gap-standard);
+}
+
+.message-pair-simple {
+  margin-bottom: var(--gap-standard);
+}
+
+.message {
+  margin-bottom: var(--gap-small);
+  word-wrap: break-word;
+}
+
+.user-message-simple {
+  text-align: left;
+  margin-bottom: var(--gap-small);
+}
+
+.user-message-simple .message-content-simple {
+  display: inline-block;
+  background: none;
+  color: var(--color-text);
+  padding: var(--gap-small) var(--gap-standard);
+  border-radius: var(--radius);
+    font-weight: 600;
+  font-style: normal;
+}
+
+.bot-message-simple {
+  text-align: left;
+  margin-bottom: var(--gap-small);
+}
+
+.bot-message-simple .message-content-simple {
+  display: inline-block;
+  background: none;
+  color: var(--color-text);
+  padding: var(--gap-small) var(--gap-standard);
+  border-radius: var(--radius);
+  font-weight: 400;
+  font-style: italic;
+}
+
+.current-thinking {
+  padding: 0 var(--gap-standard);
+  margin-bottom: var(--gap-small);
+}
+
+.history-toggle-btn {
+  background: var(--color-button);
+  border: none;
+  border-radius: var(--radius);
   padding: var(--gap-small);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+  margin-right: var(--gap-small);
+}
+
+.history-toggle-btn:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-0.0225rem);
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: var(--gap-standard);
+  background: var(--color-background-light);
+}
+
+.chat-input-always {
+  flex: 1;
+    padding: var(--gap-small) var(--gap-standard);
   border: none;
   border-radius: var(--radius);
   outline: none;
@@ -373,56 +504,17 @@ button * {
   background: var(--color-button);
   color: var(--color-text);
   box-shadow: var(--shadow);
-  margin: var(--gap-standard);
-  min-width: 0; /* Allow shrinking */
+  font-family: "Livvic", sans-serif;
+  font-style: italic;
+  margin: 0 var(--gap-small);
 }
 
-.chat-response {
-  margin: var(--gap-standard);
-  padding: var(--gap-standard);
-  border-radius: var(--radius);
-  color: var(--color-text);
-  line-height: 1.4;
-  width: 100%; /* SAME WIDTH AS INPUT */
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+.chat-input-always:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.chat-history {
-  background: var(--color-background);
-  border-radius: var(--radius);
-  padding: var(--gap-standard);
-  margin: var(--gap-standard);
-  box-shadow: var(--shadow);
-  max-height: 12.5rem; /* 200px to rem */
-  overflow-y: auto; /* SCROLLBAR OUTSIDE MESSAGE AREA */
-  width: 100%; /* SAME WIDTH AS INPUT/OUTPUT */
-}
 
-.chat-history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: var(--gap-standard);
-  padding: var(--gap-small);
-  border: 0.0625rem solid rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 0;
-  background: var(--color-background);
-}
-
-.history-item {
-  margin: var(--gap-small);
-  padding: var(--gap-small);
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: var(--radius);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.history-item:last-child {
-  margin: 0;
-}
 
 /* ==============================================
    SPECIAL COMPONENTS
@@ -461,37 +553,48 @@ button * {
    ============================================== */
 
 .category-btn {
-  background: var(--color-button);
-  color: var(--color-button-text);
-  border: none;
-  border-radius: var(--radius);
-  padding: var(--gap-small);
-  font-size: var(--text-medium);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: var(--shadow);
-  margin: var(--gap-standard);
+  background: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  color: var(--color-text-light);
+  font-weight: 400;
   min-width: 10rem;
   text-align: left;
   display: flex;
   align-items: center;
   gap: var(--gap-small);
+  padding: 0.25rem;
 }
 
 .category-btn:hover {
-  box-shadow: var(--shadow-hover);
-  transform: translateY(-0.0225rem);
+  background: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: var(--color-text);
 }
 
 .category-btn.active {
-  background: var(--color-button-active);
-  color: var(--color-button-text-active);
+  background: none !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 600;
+  font-family: "MuseoModerno", sans-serif !important;
+  font-style: italic !important;
+}
+
+.category-btn.active span {
+  background: none !important;
+  box-shadow: none !important;
+  color: var(--color-text) !important;
+  font-weight: 600;
+  font-family: "MuseoModerno", sans-serif !important;
+  font-style: italic !important;
 }
 
 .category-indent {
   margin-left: var(--gap-large);
 }
+
 
 /* ==============================================
    RESPONSIVE DESIGN
@@ -524,6 +627,20 @@ button * {
   
   .main-content {
     padding: var(--gap-small);
+  }
+
+  .main-content.chat-open {
+    padding-bottom: 60vh;
+    max-height: calc(100vh - var(--topbar-height) - 60vh);
+  }
+  
+  .chat-bar.chat-expanded {
+    height: 60vh;
+    max-height: 60vh;
+  }
+  
+  .chat-container {
+    height: calc(60vh - 3rem);
   }
   
   .grid-2,

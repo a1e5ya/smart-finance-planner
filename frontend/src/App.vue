@@ -11,21 +11,21 @@
       
       <div class="flex flex-gap">
         <button 
-          class="btn"
+          class="btn btn-link"
           :class="{ 'btn-active': currentTab === 'transactions' }"
           @click="showTab('transactions')"
         >
           Transactions
         </button>
         <button 
-          class="btn"
+          class="btn btn-link"
           :class="{ 'btn-active': currentTab === 'categories' }"
           @click="showTab('categories')"
         >
           Categories
         </button>
         <button 
-          class="btn"
+          class="btn btn-link"
           :class="{ 'btn-active': currentTab === 'timeline' }"
           @click="showTab('timeline')"
         >
@@ -34,19 +34,21 @@
       </div>
       
       <div class="flex flex-center flex-gap">
+                <span class="text-medium" @click="handleUserClick">
+          {{ user ? (user.displayName || user.email.split('@')[0]) : 'Sign In' }}
+        </span>
+        
         <button 
-          class="btn btn-icon"
+          class="btn btn-icon btn-link"
           :class="{ 'btn-active': currentTab === 'settings-sliders' }"
           @click="showTab('settings')" 
           title="Settings"
         >
           <AppIcon name="settings-sliders" size="medium" />
         </button>
-        <span class="text-medium" @click="handleUserClick">
-          {{ user ? (user.displayName || user.email.split('@')[0]) : 'Sign In' }}
-        </span>
+
         <button 
-          class="btn btn-icon" 
+          class="btn btn-icon btn-link" 
           @click="handleLogout" 
           :title="user ? 'Logout' : 'Sign In'"
         >
@@ -56,11 +58,11 @@
     </div>
 
     <!-- Main Content -->
-    <div class="main-content">
+    <div class="main-content" :class="{ 'chat-open': showChat }">
       <!-- Dashboard Tab -->
       <div v-if="currentTab === 'dashboard'" class="tab-content">
         <!-- Status Cards -->
-        <div class="section">
+
           <div class="grid grid-auto">
             <div class="card flex flex-gap">
               <div>
@@ -86,12 +88,12 @@
               </div>
             </div>
 
-            </div>
+
           </div>
         </div>
 
         <!-- Import Section -->
-        <div class="section">
+
           <div class="container container-large">
             <div class="section-header text-center">
               <div class="text-large">Import Your Financial Data</div>
@@ -127,16 +129,10 @@
             </div>
           </div>
         </div>
-      </div>
+
 
       <!-- Transactions Tab -->
       <div v-else-if="currentTab === 'transactions'" class="tab-content">
-        <div class="flex-between section-header">
-          <div class="text-large">Transaction Management</div>
-          <div class="text-small text-light">
-            Total: {{ transactionCount }} transactions • User: {{ user ? user.email.split('@')[0] : 'Guest' }}
-          </div>
-        </div>
 
         <div class="grid grid-2">
           <div class="container text-center">
@@ -162,7 +158,6 @@
       <div v-else-if="currentTab === 'categories'" class="tab-content">
         <div class="grid grid-sidebar">
           <div class="container">
-            <div class="text-medium section-header">Category Hierarchy</div>
             <div class="flex-column">
               <button class="category-btn active">
                 <span>🍽️</span>
@@ -204,11 +199,7 @@
           </div>
           
           <div class="container">
-            <div class="text-medium section-header">Smart Categorization</div>
-            <div class="text-small text-light">
-              {{ user ? `Personalized categories for ${user.email.split('@')[0]}` : 'Sign in to create custom categories' }}
-            </div>
-            
+
             <div class="flex flex-gap flex-wrap">
               <button class="btn">Split Category</button>
               <button class="btn">Merge Categories</button>
@@ -225,22 +216,15 @@
 
       <!-- Timeline Tab -->
       <div v-else-if="currentTab === 'timeline'" class="tab-content">
-        <div class="flex flex-between flex-wrap">
+
+
+
+          <div class="container text-center" style="height: 25rem;">
           <div class="flex flex-gap">
             <button class="btn btn-active">Month</button>
             <button class="btn">Quarter</button>
             <button class="btn">Year</button>
-          </div>
-          <div class="text-small text-light">
-            {{ user ? `Timeline for ${user.email.split('@')[0]}` : 'Sign in for personalized timeline' }}
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="container text-center" style="height: 25rem;">
-            <div class="text-large">Interactive Financial Timeline</div>
-            <div class="text-medium text-light">Import transaction data to see your financial timeline</div>
-          </div>
+          </div>       
         </div>
 
         <div class="grid grid-2">
@@ -263,7 +247,7 @@
       <div v-else-if="currentTab === 'settings'" class="tab-content">
         
         <!-- System Status -->
-        <div class="section">
+
           <div class="container">
             <div class="text-medium section-header">System Status</div>
             <div class="grid grid-auto">
@@ -284,10 +268,10 @@
               </div>
             </div>
           </div>
-        </div>
+
 
         <!-- User Profile -->
-        <div class="section">
+
           <div class="container">
             <div class="text-medium section-header">User Profile</div>
             <div v-if="user">
@@ -301,10 +285,10 @@
               <button class="btn" @click="showLoginModal = true">Sign In</button>
             </div>
           </div>
-        </div>
+
 
         <!-- Data Management -->
-        <div class="section">
+
           <div class="container">
             <div class="text-medium section-header">Data Management</div>
             <div class="flex flex-gap flex-wrap">
@@ -314,41 +298,68 @@
               <button class="btn">Reset Categories</button>
             </div>
           </div>
-        </div>
+
 
         
       </div>
     </div>
 
-    <!-- Chat Bar -->
-    <div class="chat-bar">
-      <!-- Chat History with External Scrollbar -->
-      <div v-if="chatHistory.length > 0" class="chat-history">
-        <div v-for="(item, index) in chatHistory" :key="index" class="history-item">
-          <div class="text-small text-muted">You: {{ item.message }}</div>
-          <div class="text-small">Bot: {{ item.response }}</div>
+<div class="chat-bar-always">
+  <!-- Welcome Message (only shown initially) -->
+  <div v-if="showWelcomeMessage && !chatHistory.length" class="welcome-message">
+    {{ welcomeText }}
+  </div>
+  
+  <!-- Chat History -->
+  <div v-if="chatHistory.length > 0 && showHistory" class="chat-history-simple">
+    <div class="chat-messages-simple">
+      <div v-for="(item, index) in chatHistory" :key="index" class="message-pair-simple">
+        <div class="message user-message-simple">
+          <div class="message-content-simple">{{ item.message }}</div>
+        </div>
+        <div class="message bot-message-simple">
+          <div class="message-content-simple">{{ item.response }}</div>
         </div>
       </div>
-
-      <!-- Chat Response -->
-      <div v-if="chatResponse" class="chat-response">
-        {{ chatResponse }}
-      </div>
-      
-      <!-- Chat Input -->
-      <div class="flex flex-gap">
-        <input 
-          type="text" 
-          class="chat-input" 
-          placeholder="Ask me anything about importing transactions..."
-          v-model="chatInput"
-          @keypress.enter="sendMessage()"
-        >
-        <button class="btn btn-active" @click="sendMessage()">
-          Send
-        </button>
-      </div>
     </div>
+  </div>
+
+  <!-- Current Response (while thinking) -->
+  <div v-if="currentThinking" class="current-thinking">
+    <div class="message bot-message-simple">
+      <div class="message-content-simple">{{ currentThinking }}</div>
+    </div>
+  </div>
+
+  <!-- Always visible input with history toggle -->
+  <div class="chat-input-row">
+    <button 
+      v-if="chatHistory.length > 0"
+      class="history-toggle-btn btn-link"
+      @click="toggleHistory"
+      :title="showHistory ? 'Hide History' : 'Show History'"
+    >
+      <AppIcon :name="showHistory ? 'angle-down' : 'angle-up'" size="medium" />
+    </button>
+    <input 
+      type="text" 
+      class="chat-input-always" 
+      v-model="chatInput"
+      @keypress.enter="sendMessage()"
+      @click="showHistory = true"
+      :disabled="loading"
+    >
+<button 
+  class="btn btn-link" 
+  @click="sendMessage()"
+  :disabled="loading || !chatInput.trim()"
+>
+  <AppIcon name="arrow-right" size="medium" />
+</button>
+  </div>
+</div>
+
+
 
     <!-- Login Modal -->
     <LoginModal :showModal="showLoginModal" @close="showLoginModal = false" />
@@ -356,7 +367,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import axios from 'axios'
 import { auth } from '@/firebase/config'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -370,51 +381,88 @@ export default {
     LoginModal
   },
   setup() {
+    // Core app state
     const currentTab = ref('dashboard')
     const user = ref(null)
-    const chatInput = ref('')
-    const chatResponse = ref('')
     const backendStatus = ref('Checking...')
     const phase = ref('1 - Transaction Import')
     const showLoginModal = ref(false)
+    
+    // Chat state
+    const chatInput = ref('')
+    const chatHistory = ref([])
+    const loading = ref(false)
+    const currentThinking = ref('')
+    const showWelcomeMessage = ref(true)
+    const showHistory = ref(false)
+    
+    // File upload state
     const transactionCount = ref(0)
     const recentUploads = ref([])
-    const chatHistory = ref([])
     const fileInput = ref(null)
 
     // Dynamic API base URL
     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001'
 
-    // Initialize with welcome message
-    const initializeWelcomeMessage = () => {
+    // Welcome message
+    const welcomeText = computed(() => {
       const userName = user.value ? 
         (user.value.displayName || user.value.email.split('@')[0]) : 
         'there'
-      
-      chatResponse.value = `Hello, ${userName}! How are you today? I'm here to help you with your financial data. You can upload CSV files, ask questions about budgeting, or explore your transaction categories.`
+      return `Hello, ${userName}! I'm here to help you with your financial data. You can ask questions about budgeting, upload CSV files, or explore your transaction categories.`
+    })
+
+    // Chat functions
+    const toggleHistory = () => {
+      showHistory.value = !showHistory.value
     }
 
-    // Check backend health
-    const checkBackend = async () => {
-      try {
-        const response = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
-        backendStatus.value = 'Connected'
-        phase.value = response.data.phase || 'Phase 1'
-        console.log('✅ Backend connected:', response.data)
-      } catch (error) {
-        backendStatus.value = 'Disconnected'
-        console.error('Backend connection failed:', error)
+const scrollToBottom = async () => {
+  await nextTick()
+  
+  // Wait a bit longer for the DOM to fully update
+  setTimeout(() => {
+    // Try multiple selectors to find the chat container
+    const historyElement = document.querySelector('.chat-messages-simple') || 
+                          document.querySelector('.chat-history-simple') ||
+                          document.querySelector('.chat-bar-always')
+    
+    if (historyElement) {
+      // Use scrollIntoView for more reliable scrolling
+      const lastMessage = historyElement.querySelector('.message-pair-simple:last-child') ||
+                         historyElement.querySelector('.current-thinking') ||
+                         historyElement.lastElementChild
+      
+      if (lastMessage) {
+        lastMessage.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'end'
+        })
+      } else {
+        // Fallback to scrollTop method
+        historyElement.scrollTo({
+          top: historyElement.scrollHeight,
+          behavior: 'smooth'
+        })
       }
     }
+  }, 100) // Increased timeout for better reliability
+}
 
-    // Send chat message with auth token
     const sendMessage = async (message = null) => {
       const messageText = message || chatInput.value.trim()
-      if (!messageText) return
+      if (!messageText || loading.value) return
 
       const originalInput = chatInput.value
+      loading.value = true
       chatInput.value = ''
-      chatResponse.value = 'Thinking...'
+      currentThinking.value = 'Thinking...'
+      
+      // Hide welcome message after first interaction
+      showWelcomeMessage.value = false
+      
+      // Show history when sending message
+      showHistory.value = true
 
       try {
         let headers = {}
@@ -427,18 +475,21 @@ export default {
           message: messageText
         }, { headers, timeout: 15000 })
         
-        chatResponse.value = response.data.response
+        const botResponse = response.data.response
         
         // Add to chat history
-        chatHistory.value.unshift({
+        chatHistory.value.push({
           message: messageText,
-          response: response.data.response,
+          response: botResponse,
           timestamp: new Date().toLocaleTimeString()
         })
         
-        // Keep only last 10 conversations
-        if (chatHistory.value.length > 10) {
-          chatHistory.value = chatHistory.value.slice(0, 10)
+        // Scroll to bottom after adding message
+        scrollToBottom()
+        
+        // Keep only last 20 conversations
+        if (chatHistory.value.length > 20) {
+          chatHistory.value = chatHistory.value.slice(-20)
         }
         
         // Handle navigation commands
@@ -454,8 +505,32 @@ export default {
         
       } catch (error) {
         console.error('Chat request failed:', error)
-        chatResponse.value = `Error: ${error.message}. Please check if the backend is running.`
+        const errorResponse = `Error: ${error.message}. Please check if the backend is running.`
+        
+        chatHistory.value.push({
+          message: messageText,
+          response: errorResponse,
+          timestamp: new Date().toLocaleTimeString()
+        })
+
+        scrollToBottom()
         chatInput.value = originalInput
+      } finally {
+        loading.value = false
+        currentThinking.value = ''
+      }
+    }
+
+    // Backend health check
+    const checkBackend = async () => {
+      try {
+        const response = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
+        backendStatus.value = 'Connected'
+        phase.value = response.data.phase || 'Phase 1'
+        console.log('✅ Backend connected:', response.data)
+      } catch (error) {
+        backendStatus.value = 'Disconnected'
+        console.error('Backend connection failed:', error)
       }
     }
 
@@ -493,7 +568,18 @@ export default {
         setTimeout(() => {
           upload.status = 'success'
           transactionCount.value += upload.rows
-          chatResponse.value = `Successfully processed ${file.name} with ${upload.rows} transactions!`
+          
+          // Add success message to chat
+          chatHistory.value.push({
+            message: `File uploaded: ${file.name}`,
+            response: `Successfully processed ${file.name} with ${upload.rows} transactions!`,
+            timestamp: new Date().toLocaleTimeString()
+          })
+          
+          // Show history and scroll to bottom
+          showHistory.value = true
+          scrollToBottom()
+          showWelcomeMessage.value = false
         }, 2000)
       })
     }
@@ -502,15 +588,12 @@ export default {
       sendMessage('show me sample CSV format')
     }
 
-    const clearChatHistory = () => {
-      chatHistory.value = []
-      initializeWelcomeMessage()
-    }
-
+    // Navigation functions
     const showTab = (tabName) => {
       currentTab.value = tabName
     }
 
+    // Auth functions
     const handleUserClick = () => {
       if (!user.value) {
         showLoginModal.value = true
@@ -521,7 +604,17 @@ export default {
       if (user.value) {
         try {
           await auth.signOut()
-          chatResponse.value = "You've been signed out. Sign in again for personalized features!"
+          // Add logout message to chat
+          chatHistory.value.push({
+            message: 'Logout',
+            response: "You've been signed out. Sign in again for personalized features!",
+            timestamp: new Date().toLocaleTimeString()
+          })
+          
+          // Show history and scroll to bottom
+          showHistory.value = true
+          scrollToBottom()
+          showWelcomeMessage.value = false
         } catch (error) {
           console.error('Logout error:', error)
         }
@@ -537,38 +630,57 @@ export default {
       onAuthStateChanged(auth, (firebaseUser) => {
         user.value = firebaseUser
         console.log('Auth state changed:', firebaseUser ? firebaseUser.email : 'signed out')
-        initializeWelcomeMessage()
+        
+        // Add welcome message to history
+        if (chatHistory.value.length === 0) {
+          const userName = firebaseUser ? 
+            (firebaseUser.displayName || firebaseUser.email.split('@')[0]) : 
+            'there'
+          
+          chatHistory.value.push({
+            response: `Hello, ${userName}! I'm here to help you with your financial data. You can ask questions about budgeting, upload CSV files, or explore your transaction categories.`,
+            timestamp: new Date().toLocaleTimeString()
+          })
+          
+          showWelcomeMessage.value = false
+        }
       })
-
-      initializeWelcomeMessage()
     })
 
     return {
+      // Core state
       currentTab,
       user,
-      chatInput,
-      chatResponse,
       backendStatus,
       phase,
       showLoginModal,
+      
+      // Chat state
+      chatInput,
+      chatHistory,
+      loading,
+      currentThinking,
+      showWelcomeMessage,
+      showHistory,
+      welcomeText,
+      
+      // File upload state
       transactionCount,
       recentUploads,
-      chatHistory,
       fileInput,
+      
+      // Functions
+      toggleHistory,
       sendMessage,
-      showTab,
-      handleUserClick,
-      handleLogout,
+      scrollToBottom,
       triggerFileUpload,
       handleFileSelect,
       handleFileDrop,
       showSampleData,
-      clearChatHistory
+      showTab,
+      handleUserClick,
+      handleLogout
     }
   }
 }
 </script>
-
-<style>
-@import './assets/styles.css';
-</style>
