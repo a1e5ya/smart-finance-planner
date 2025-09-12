@@ -1,8 +1,8 @@
-from sqlalchemy import Column, String, DateTime, Text, JSON, create_engine
+from sqlalchemy import Column, String, DateTime, Text, JSON, Numeric, Boolean, Integer, ForeignKey, create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 import uuid
 from datetime import datetime
 import os
@@ -61,7 +61,112 @@ class User(Base):
     firebase_uid = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, nullable=True)
     display_name = Column(String, nullable=True)
+    locale = Column(String, default="en-US")
+    currency = Column(String, default="USD")
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")
+    categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
+    transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
+    goals = relationship("Goal", back_populates="user", cascade="all, delete-orphan")
+
+class Account(Base):
+    __tablename__ = "accounts"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    account_type = Column(String, nullable=True)  # checking, savings, credit
+    institution = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="accounts")
+    transactions = relationship("Transaction", back_populates="account", cascade="all, delete-orphan")
+
+class Category(Base):
+    __tablename__ = "categories"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
+    name = Column(String, nullable=False)
+    code = Column(String, nullable=True)  # slug for system categories
+    version = Column(Integer, default=1)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="categories")
+    parent = relationship("Category", remote_side=[id], backref="children")
+    transactions = relationship("Transaction", back_populates="category")
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True)
+    posted_at = Column(DateTime, nullable=False, index=True)
+    amount = Column(Numeric(10, 2), nullable=False)
+    currency = Column(String, default="USD")
+    merchant = Column(String, nullable=True)
+    memo = Column(Text, nullable=True)
+    mcc = Column(String, nullable=True)  # Merchant Category Code
+    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True)
+    source_category = Column(String, default="user")  # user|rule|ml|llm
+    import_batch_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    hash_dedupe = Column(String, nullable=True, index=True)  # For deduplication
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="transactions")
+    account = relationship("Account", back_populates="transactions")
+    category = relationship("Category", back_populates="transactions")
+
+class CategoryMapping(Base):
+    __tablename__ = "category_mappings"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    pattern_type = Column(String, nullable=False)  # keyword|regex|mcc|merchant_exact
+    pattern_value = Column(String, nullable=False)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
+    priority = Column(Integer, default=0)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Goal(Base):
+    __tablename__ = "goals"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    goal_type = Column(String, nullable=False)  # savings|spending|paydown
+    target_amount = Column(Numeric(10, 2), nullable=False)
+    target_date = Column(DateTime, nullable=True)
+    category_scope = Column(JSON, nullable=True)  # Which categories apply
+    status = Column(String, default="active")  # active|done|archived
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="goals")
+
+class ImportBatch(Base):
+    __tablename__ = "import_batches"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    filename = Column(String, nullable=False)
+    file_size = Column(Integer, nullable=True)
+    rows_imported = Column(Integer, default=0)
+    rows_duplicated = Column(Integer, default=0)
+    rows_errors = Column(Integer, default=0)
+    status = Column(String, default="processing")  # processing|completed|failed
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
 
 class AuditLog(Base):
     __tablename__ = "audit_log"
@@ -69,8 +174,8 @@ class AuditLog(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), nullable=True)  # FK to users.id
     firebase_uid = Column(String, nullable=True)  # Backup identifier
-    entity = Column(String, nullable=False)  # 'chat', 'auth', 'system'
-    action = Column(String, nullable=False)  # 'message', 'login', 'signup', 'error'
+    entity = Column(String, nullable=False)  # 'chat', 'auth', 'system', 'transaction'
+    action = Column(String, nullable=False)  # 'message', 'login', 'signup', 'error', 'import'
     details = Column(JSON, nullable=True)    # Store request/response data
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)

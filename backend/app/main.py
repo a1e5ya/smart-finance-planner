@@ -18,7 +18,7 @@ print(f"   ALLOWED_ORIGINS env var: {os.getenv('ALLOWED_ORIGINS', 'NOT SET')}")
 print(f"   Parsed origins: {settings.ALLOWED_ORIGINS}")
 
 # Import other modules after settings
-from app.routers import auth, chat
+from app.routers import auth, chat, transactions
 from app.models.database import init_database
 
 # Lifespan manager for startup/shutdown events
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Phase 1 - Authentication + Database Integration",
+    description="Phase 1 - Transaction Import & Database Integration",
     version=settings.VERSION,
     lifespan=lifespan
 )
@@ -60,35 +60,48 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
+app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 
 @app.get("/health")
 async def health_check():
     return {
         "status": "ok",
-        "phase": "1 - Database Connected",
+        "phase": "1 - Transaction Import Ready",
         "features": [
             "firebase_auth", 
             "neon_database", 
             "user_management", 
             "audit_logging",
-            "personalized_chat"
+            "personalized_chat",
+            "csv_import",
+            "transaction_storage",
+            "categorization_system"
         ],
         "database": "✅ Connected" if settings.DATABASE_URL else "❌ Not configured",
-        "cors_origins": settings.ALLOWED_ORIGINS,  # Add this for debugging
+        "cors_origins": settings.ALLOWED_ORIGINS,
         "port": os.getenv("PORT", "8001"),
-        "host": "Railway" if os.getenv("RAILWAY_ENVIRONMENT") else "Local"
+        "host": "Railway" if os.getenv("RAILWAY_ENVIRONMENT") else "Local",
+        "new_endpoints": [
+            "/transactions/import - Upload CSV files",
+            "/transactions/list - Get transactions with filters",
+            "/transactions/summary - Get transaction statistics",
+            "/transactions/categorize/{id} - Manually categorize",
+            "/transactions/batch/{id} - Delete import batch"
+        ]
     }
 
 @app.get("/")
 async def root():
     return {
         "message": "Smart Finance Planner API",
-        "phase": "Phase 1 Complete",
+        "phase": "Phase 1 - Transaction Import Ready",
         "endpoints": [
             "/health - System status",
             "/auth/verify - Verify Firebase token",
             "/auth/me - Get user profile", 
             "/chat/command - Send chat message",
+            "/transactions/import - Upload CSV files",
+            "/transactions/list - Get transactions",
             "/docs - API documentation"
         ],
         "environment": "Railway" if os.getenv("RAILWAY_ENVIRONMENT") else "Local"
