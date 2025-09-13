@@ -1,530 +1,178 @@
 <template>
   <div id="app">
-    <!-- Top Bar -->
-    <div class="top-bar">
-      <button 
-        class="btn btn-active museo-dashboard"
-        @click="showTab('dashboard')"
-      >
-        <span class="text-medium">azimuth</span>
-      </button>
-      
-      <div class="flex flex-gap">
-        <button 
-          class="btn btn-link"
-          :class="{ 'btn-active': currentTab === 'transactions' }"
-          @click="showTab('transactions')"
-        >
-          Transactions
-        </button>
-        <button 
-          class="btn btn-link"
-          :class="{ 'btn-active': currentTab === 'categories' }"
-          @click="showTab('categories')"
-        >
-          Categories
-        </button>
-        <button 
-          class="btn btn-link"
-          :class="{ 'btn-active': currentTab === 'timeline' }"
-          @click="showTab('timeline')"
-        >
-          Timeline
-        </button>
-      </div>
-      
-      <div class="flex flex-center flex-gap">
-        <span class="text-medium" @click="handleUserClick">
-          {{ user ? (user.displayName || user.email.split('@')[0]) : 'Sign In' }}
-        </span>
+    <!-- Show Login Screen for Unauthenticated Users -->
+    <div v-if="!user" class="login-screen">
+      <div class="login-container">
+        <div class="logo-section">
+          <h1 class="museo-dashboard">azimuth</h1>
+          <p class="tagline">Your Personal Finance Assistant</p>
+        </div>
         
-        <button 
-          class="btn btn-icon btn-link"
-          :class="{ 'btn-active': currentTab === 'settings' }"
-          @click="showTab('settings')" 
-          title="Settings"
-        >
-          <AppIcon name="settings-sliders" size="medium" />
-        </button>
-
-        <button 
-          class="btn btn-icon btn-link" 
-          @click="handleLogout" 
-          :title="user ? 'Logout' : 'Sign In'"
-        >
-          <AppIcon :name="user ? 'sign-out' : 'login'" size="medium" />
-        </button>
+        <LoginModal :showModal="true" @close="() => {}" :isFullScreen="true" />
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="main-content" :class="{ 'chat-open': showChat }">
-      
-      <!-- Dashboard Tab -->
-      <div v-if="currentTab === 'dashboard'" class="tab-content">
-        <div class="grid grid-auto">
-          <div class="card flex flex-gap">
-            <div>
-              <div class="text-small text-muted">Data Import</div>
-              <div class="text-medium">{{ transactionCount }} transactions</div>
-              <div class="text-small text-light">Ready to import CSV files</div>
-            </div>
-          </div>
-          
-          <div class="card flex flex-gap">
-            <div class="text-medium section-header">Recent Activity</div>
-            <div class="flex-column flex-gap-sm">
-              <div v-if="recentUploads.length === 0" class="text-center text-light">
-                No recent imports. Upload your first CSV file to get started!
-              </div>
-              <div v-for="upload in recentUploads" :key="upload.id" class="card flex flex-gap">
-                <div class="status-icon">{{ upload.status === 'success' ? '✅' : '⏳' }}</div>
-                <div>
-                  <div class="text-medium">{{ upload.filename }}</div>
-                  <div class="text-small text-light">{{ upload.timestamp }} • {{ upload.rows }} rows</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="container container-large">
-          <div class="section-header text-center">
-            <div class="text-large">Import Your Financial Data</div>
-            <div class="text-medium text-light">Upload CSV files from your bank or financial institution</div>
-          </div>
-          
-          <div 
-            class="drop-zone" 
-            @click="triggerFileUpload"
-            @drop.prevent="handleFileDrop"
-            @dragover.prevent
-            @dragenter.prevent
-            :class="{ 'drop-active': isDragging }"
-            @dragenter="isDragging = true"
-            @dragleave="isDragging = false"
+    <!-- Main App for Authenticated Users -->
+    <div v-else class="authenticated-app">
+      <!-- Top Bar -->
+      <div class="top-bar">
+        <button 
+          class="btn btn-active museo-dashboard"
+          @click="showTab('dashboard')"
+        >
+          <span class="text-medium">azimuth</span>
+        </button>
+        
+        <div class="flex flex-gap">
+          <button 
+            class="btn btn-link"
+            :class="{ 'btn-active': currentTab === 'transactions' }"
+            @click="showTab('transactions')"
           >
-            <div class="flex-column flex-center flex-gap">
-              <AppIcon name="upload" size="large" />
-              <div class="text-large">Drag & Drop CSV Files</div>
-              <div class="text-medium text-light">Or click to browse and select files</div>
-            </div>
-            <input 
-              ref="fileInput" 
-              type="file" 
-              accept=".csv,.xlsx" 
-              multiple 
-              @change="handleFileSelect" 
-              style="display: none;"
-            >
-          </div>
-          
-          <div class="flex flex-center flex-gap flex-wrap">
-            <button class="btn btn-active" @click="triggerFileUpload">
-              Choose Files
-            </button>
-            <button class="btn" @click="showSampleData">
-              View Sample
-            </button>
-            <button class="btn" @click="sendMessage('help import')">
-              Import Help
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Transactions Tab -->
-      <div v-else-if="currentTab === 'transactions'" class="tab-content">
-        <!-- Import Section -->
-        <div class="container container-large">
-          <div class="section-header text-center">
-            <div class="text-large">Import & Manage Transactions</div>
-            <div class="text-medium text-light">Upload CSV files from your bank or financial institution</div>
-          </div>
-          
-          <div 
-            class="drop-zone" 
-            @click="triggerFileUpload"
-            @drop.prevent="handleFileDrop"
-            @dragover.prevent
-            @dragenter.prevent
-            :class="{ 'drop-active': isDragging }"
-            @dragenter="isDragging = true"
-            @dragleave="isDragging = false"
+            Transactions
+          </button>
+          <button 
+            class="btn btn-link"
+            :class="{ 'btn-active': currentTab === 'categories' }"
+            @click="showTab('categories')"
           >
-            <div class="flex-column flex-center flex-gap">
-              <AppIcon name="upload" size="large" />
-              <div class="text-large">Drag & Drop CSV Files</div>
-              <div class="text-medium text-light">Or click to browse and select files</div>
-            </div>
-            <input 
-              ref="fileInput" 
-              type="file" 
-              accept=".csv,.xlsx" 
-              multiple 
-              @change="handleFileSelect" 
-              style="display: none;"
-            >
-          </div>
-          
-          <div class="flex flex-center flex-gap flex-wrap">
-            <button class="btn btn-active" @click="triggerFileUpload">
-              Choose Files
-            </button>
-          </div>
+            Categories
+          </button>
+          <button 
+            class="btn btn-link"
+            :class="{ 'btn-active': currentTab === 'timeline' }"
+            @click="showTab('timeline')"
+          >
+            Timeline
+          </button>
         </div>
-
-        <!-- Recent Uploads -->
-        <div class="container" v-if="recentUploads.length > 0">
-          <div class="text-medium section-header">Recent Imports</div>
-          <div class="flex-column flex-gap-sm">
-            <div v-for="upload in recentUploads" :key="upload.id" class="card flex flex-gap">
-              <div class="status-icon">{{ upload.status === 'success' ? '✅' : upload.status === 'error' ? '❌' : '⏳' }}</div>
-              <div>
-                <div class="text-medium">{{ upload.filename }}</div>
-                <div class="text-small text-light">{{ upload.timestamp }} • {{ upload.rows }} rows</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Transaction Management -->
-        <div class="container">
-          <div class="flex flex-between flex-wrap">
-            <div class="text-medium section-header">Transaction History ({{ transactionCount }} total)</div>
-            <div class="flex flex-gap">
-              <button class="btn" @click="refreshTransactions">
-                <AppIcon name="refresh" size="medium" />
-                Refresh
-              </button>
-            </div>
-          </div>
+        
+        <div class="flex flex-center flex-gap">
+          <span class="text-medium user-info">
+            {{ user.displayName || user.email.split('@')[0] }}
+          </span>
           
-          <!-- Filters -->
-          <div class="flex flex-gap flex-wrap">
-            <input 
-              type="date" 
-              v-model="filters.startDate" 
-              class="chat-input-always"
-              placeholder="Start Date"
-            >
-            <input 
-              type="date" 
-              v-model="filters.endDate" 
-              class="chat-input-always"
-              placeholder="End Date"
-            >
-            <input 
-              type="text" 
-              v-model="filters.merchant" 
-              class="chat-input-always"
-              placeholder="Search merchant..."
-            >
-            <select v-model="filters.categoryId" class="chat-input-always">
-              <option value="">All Categories</option>
-              <option v-for="category in allCategories" :key="category.id" :value="category.id">
-                {{ category.name }}
-              </option>
-            </select>
-          </div>
-        </div>
+          <button 
+            class="btn btn-icon btn-link"
+            :class="{ 'btn-active': currentTab === 'settings' }"
+            @click="showTab('settings')" 
+            title="Settings"
+          >
+            <AppIcon name="settings-sliders" size="medium" />
+          </button>
 
-        <!-- Transactions Table -->
-        <div class="container">
-          <div v-if="loading" class="text-center">
-            Loading transactions...
-          </div>
-          <div v-else-if="transactions.length === 0" class="text-center text-light">
-            No transactions found. Upload CSV files to get started.
-          </div>
-          <div v-else class="transactions-table">
-            <div class="transaction-row header">
-              <div class="col-date">Date</div>
-              <div class="col-merchant">Merchant</div>
-              <div class="col-amount">Amount</div>
-              <div class="col-category">Category</div>
-              <div class="col-actions">Actions</div>
-            </div>
-            <div 
-              v-for="transaction in transactions" 
-              :key="transaction.id"
-              class="transaction-row"
-            >
-              <div class="col-date">
-                {{ formatDate(transaction.posted_at) }}
-              </div>
-              <div class="col-merchant">
-                <div class="text-medium">{{ transaction.merchant || 'Unknown' }}</div>
-                <div class="text-small text-light">{{ transaction.memo }}</div>
-              </div>
-              <div class="col-amount" :class="{ 'negative': parseFloat(transaction.amount) < 0 }">
-                {{ formatAmount(transaction.amount) }}
-              </div>
-              <div class="col-category">
-                <div v-if="transaction.category_name" class="category-tag">
-                  <AppIcon :name="getCategoryIcon(transaction.category_id)" size="small" />
-                  {{ transaction.category_name }}
-                </div>
-                <select 
-                  v-else 
-                  @change="categorizeTransaction(transaction.id, $event.target.value)"
-                  class="category-select"
-                >
-                  <option value="">Select category...</option>
-                  <option v-for="category in allCategories" :key="category.id" :value="category.id">
-                    {{ category.name }}
-                  </option>
-                </select>
-              </div>
-              <div class="col-actions">
-                <button class="btn btn-small" @click="editTransaction(transaction)">
-                  <AppIcon name="edit" size="small" />
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Pagination -->
-          <div class="flex flex-center flex-gap" v-if="transactions.length > 0">
-            <button 
-              class="btn" 
-              @click="changePage(currentPage - 1)"
-              :disabled="currentPage <= 1"
-            >
-              Previous
-            </button>
-            <span class="text-medium">Page {{ currentPage }}</span>
-            <button 
-              class="btn" 
-              @click="changePage(currentPage + 1)"
-              :disabled="transactions.length < pageSize"
-            >
-              Next
-            </button>
-          </div>
+          <button 
+            class="btn btn-icon btn-link" 
+            @click="handleLogout" 
+            title="Logout"
+          >
+            <AppIcon name="sign-out" size="medium" />
+          </button>
         </div>
       </div>
 
-      <!-- Categories Tab -->
-      <div v-else-if="currentTab === 'categories'" class="tab-content">
-        <div class="grid grid-sidebar">
-          <!-- Category Tree -->
-          <div class="container">
-            <div class="text-medium section-header">Categories</div>
-            <div class="flex-column">
-              <div v-for="mainCategory in categoriesData" :key="mainCategory.id" class="category-group">
-                <button 
-                  class="category-btn"
-                  :class="{ 'active': selectedCategory?.id === mainCategory.id }"
-                  @click="selectCategory(mainCategory)"
-                >
-                  <AppIcon :name="mainCategory.icon" size="medium" />
-                  <span>{{ mainCategory.name }}</span>
-                </button>
-                
-                <!-- Subcategories for Expenses -->
-                <div v-if="mainCategory.id === 'expenses'" class="subcategories">
-                  <div v-for="categoryType in expenseCategories" :key="categoryType.name" class="category-type">
-                    <div class="category-type-header">{{ categoryType.name }}</div>
-                    <button 
-                      v-for="subcategory in categoryType.subcategories"
-                      :key="subcategory.id"
-                      class="category-btn category-indent"
-                      :class="{ 'active': selectedCategory?.id === subcategory.id }"
-                      @click="selectCategory(subcategory)"
-                    >
-                      <AppIcon :name="subcategory.icon" size="medium" />
-                      <span>{{ subcategory.name }}</span>
-                    </button>
-                  </div>
-                </div>
-                
-                <!-- Regular subcategories for other categories -->
-                <div v-else-if="mainCategory.children" class="subcategories">
-                  <button 
-                    v-for="subcategory in mainCategory.children"
-                    :key="subcategory.id"
-                    class="category-btn category-indent"
-                    :class="{ 'active': selectedCategory?.id === subcategory.id }"
-                    @click="selectCategory(subcategory)"
-                  >
-                    <AppIcon :name="subcategory.icon" size="medium" />
-                    <span>{{ subcategory.name }}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Category Details -->
-          <div class="container">
-            <div v-if="selectedCategory" class="flex-column flex-gap">
-              <div class="flex flex-gap">
-                <AppIcon :name="selectedCategory.icon" size="large" />
-                <div>
-                  <div class="text-large">{{ selectedCategory.name }}</div>
-                  <div class="text-small text-light">
-                    {{ selectedCategory.category || selectedCategory.name }} Category
-                  </div>
-                </div>
-              </div>
-              
-              <div class="flex flex-gap flex-wrap">
-                <button class="btn">Edit Category</button>
-                <button class="btn">Add Rule</button>
-                <button class="btn">View Transactions</button>
-              </div>
-              
-              <div class="container text-center" style="height: 12.5rem;">
-                <div class="text-medium">Category Analytics</div>
-                <div class="text-small text-light">
-                  Transaction data will show spending patterns for this category
-                </div>
-              </div>
-            </div>
-            
-            <div v-else class="text-center text-light">
-              Select a category to view details
-            </div>
-          </div>
-        </div>
+      <!-- Main Content -->
+      <div class="main-content" :class="{ 'chat-open': showChat }">
+        
+        <!-- Dashboard Tab -->
+        <DashboardTab v-if="currentTab === 'dashboard'" />
+
+        <!-- Transactions Tab -->
+        <TransactionsTab 
+          v-else-if="currentTab === 'transactions'"
+          :user="user"
+          :transactionCount="transactionCount"
+          :recentUploads="recentUploads"
+          :transactions="transactions"
+          :loading="loading"
+          :currentPage="currentPage"
+          :pageSize="pageSize"
+          :filters="filters"
+          :allCategories="allCategories"
+          @file-upload="handleFileUpload"
+          @refresh-transactions="refreshTransactions"
+          @change-page="changePage"
+          @categorize-transaction="categorizeTransaction"
+          @edit-transaction="editTransaction"
+          @update-transaction-count="updateTransactionCount"
+        />
+
+        <!-- Categories Tab -->
+        <CategoriesTab 
+          v-else-if="currentTab === 'categories'"
+          :categoriesData="categoriesData"
+          :selectedCategory="selectedCategory"
+          :expenseCategories="expenseCategories"
+          @select-category="selectCategory"
+        />
+
+        <!-- Timeline Tab -->
+        <TimelineTab v-else-if="currentTab === 'timeline'" />
+
+        <!-- Settings Tab -->
+        <SettingsTab 
+          v-else-if="currentTab === 'settings'"
+          :user="user"
+          :backendStatus="backendStatus"
+          :phase="phase"
+          @logout="handleLogout"
+          @show-tab="showTab"
+        />
       </div>
 
-      <!-- Timeline Tab -->
-      <div v-else-if="currentTab === 'timeline'" class="tab-content">
-        <div class="container text-center" style="height: 25rem;">
-          <div class="flex flex-gap">
-            <button class="btn btn-active">Month</button>
-            <button class="btn">Quarter</button>
-            <button class="btn">Year</button>
-          </div>
-          <div class="text-medium">Timeline visualization coming soon</div>
-          <div class="text-small text-light">Import transactions to see spending trends over time</div>
+      <!-- Always Visible Chat Bar -->
+      <div class="chat-bar-always">
+        <div v-if="showWelcomeMessage && !chatHistory.length" class="welcome-message">
+          {{ welcomeText }}
         </div>
-
-        <div class="grid grid-2">
-          <div class="container text-center">
-            <div class="text-medium">Financial Goals</div>
-            <div class="text-small text-light">
-              Set and track financial goals after importing your transaction data.
-            </div>
-          </div>
-          
-          <div class="container text-center">
-            <div class="text-medium">Scenario Planning</div>
-            <div class="text-small text-light">Create what-if scenarios for your financial future.</div>
-            <button class="btn">Create Scenario</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Settings Tab -->
-      <div v-else-if="currentTab === 'settings'" class="tab-content">
-        <!-- System Status -->
-        <div class="container">
-          <div class="text-medium section-header">System Status</div>
-          <div class="grid grid-auto">
-            <div class="card text-center">
-              <div class="text-small text-muted">Authentication</div>
-              <div class="text-medium">{{ user ? 'Signed In' : 'Anonymous' }}</div>
-              <div class="text-small text-light">{{ user ? user.email : 'Not authenticated' }}</div>
-            </div>
-            <div class="card text-center">
-              <div class="text-small text-muted">Backend Status</div>
-              <div class="text-medium">{{ backendStatus }}</div>
-              <div class="text-small text-light">API Connection</div>
-            </div>
-            <div class="card text-center">
-              <div class="text-small text-muted">Phase Progress</div>
-              <div class="text-medium">{{ phase }}</div>
-              <div class="text-small text-light">Current Development Phase</div>
+        
+        <div v-if="chatHistory.length > 0 && showHistory" class="chat-history-simple">
+          <div class="chat-messages-simple">
+            <div v-for="(item, index) in chatHistory" :key="index" class="message-pair-simple">
+              <div class="message user-message-simple">
+                <div class="message-content-simple">{{ item.message }}</div>
+              </div>
+              <div class="message bot-message-simple">
+                <div class="message-content-simple">{{ item.response }}</div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- User Profile -->
-        <div class="container">
-          <div class="text-medium section-header">User Profile</div>
-          <div v-if="user">
-            <div class="text-small"><strong>Email:</strong> {{ user.email }}</div>
-            <div class="text-small"><strong>UID:</strong> {{ user.uid.substring(0, 16) }}...</div>
-            <div class="text-small"><strong>Display Name:</strong> {{ user.displayName || 'Not set' }}</div>
-            <button class="btn" @click="handleLogout">Sign Out</button>
-          </div>
-          <div v-else>
-            <div class="text-small text-light">Sign in to access personalized features and secure data storage.</div>
-            <button class="btn" @click="showLoginModal = true">Sign In</button>
+        <div v-if="currentThinking" class="current-thinking">
+          <div class="message bot-message-simple">
+            <div class="message-content-simple">{{ currentThinking }}</div>
           </div>
         </div>
 
-        <!-- Data Management -->
-        <div class="container">
-          <div class="text-medium section-header">Data Management</div>
-          <div class="flex flex-gap flex-wrap">
-            <button class="btn" @click="showTab('dashboard')">Import Data</button>
-            <button class="btn">Export Data</button>
-            <button class="btn">Clear All Data</button>
-            <button class="btn">Reset Categories</button>
-          </div>
+        <div class="chat-input-row">
+          <button 
+            v-if="chatHistory.length > 0"
+            class="history-toggle-btn btn-link"
+            @click="toggleHistory"
+            :title="showHistory ? 'Hide History' : 'Show History'"
+          >
+            <AppIcon :name="showHistory ? 'angle-down' : 'angle-up'" size="medium" />
+          </button>
+          <input 
+            type="text" 
+            class="chat-input-always" 
+            v-model="chatInput"
+            @keypress.enter="sendMessage()"
+            @click="showHistory = true"
+            :disabled="loading"
+            placeholder="Ask about your finances..."
+          >
+          <button 
+            class="btn btn-link" 
+            @click="sendMessage()"
+            :disabled="loading || !chatInput.trim()"
+          >
+            <AppIcon name="arrow-right" size="medium" />
+          </button>
         </div>
       </div>
     </div>
-
-    <!-- Always Visible Chat Bar -->
-    <div class="chat-bar-always">
-      <div v-if="showWelcomeMessage && !chatHistory.length" class="welcome-message">
-        {{ welcomeText }}
-      </div>
-      
-      <div v-if="chatHistory.length > 0 && showHistory" class="chat-history-simple">
-        <div class="chat-messages-simple">
-          <div v-for="(item, index) in chatHistory" :key="index" class="message-pair-simple">
-            <div class="message user-message-simple">
-              <div class="message-content-simple">{{ item.message }}</div>
-            </div>
-            <div class="message bot-message-simple">
-              <div class="message-content-simple">{{ item.response }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="currentThinking" class="current-thinking">
-        <div class="message bot-message-simple">
-          <div class="message-content-simple">{{ currentThinking }}</div>
-        </div>
-      </div>
-
-      <div class="chat-input-row">
-        <button 
-          v-if="chatHistory.length > 0"
-          class="history-toggle-btn btn-link"
-          @click="toggleHistory"
-          :title="showHistory ? 'Hide History' : 'Show History'"
-        >
-          <AppIcon :name="showHistory ? 'angle-down' : 'angle-up'" size="medium" />
-        </button>
-        <input 
-          type="text" 
-          class="chat-input-always" 
-          v-model="chatInput"
-          @keypress.enter="sendMessage()"
-          @click="showHistory = true"
-          :disabled="loading"
-          placeholder="Ask about your finances..."
-        >
-        <button 
-          class="btn btn-link" 
-          @click="sendMessage()"
-          :disabled="loading || !chatInput.trim()"
-        >
-          <AppIcon name="arrow-right" size="medium" />
-        </button>
-      </div>
-    </div>
-
-    <!-- Login Modal -->
-    <LoginModal :showModal="showLoginModal" @close="showLoginModal = false" />
   </div>
 </template>
 
@@ -533,15 +181,29 @@ import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import axios from 'axios'
 import { auth } from '@/firebase/config'
 import { onAuthStateChanged } from 'firebase/auth'
-import LoginModal from '@/components/LoginModal.vue'
+
+// Component imports
 import AppIcon from '@/components/AppIcon.vue'
-import { categoriesData, getCategoryById, getAllExpenseCategories } from '@/data/categories.js'
+import LoginModal from '@/components/LoginModal.vue'
+import DashboardTab from '@/components/DashboardTab.vue'
+import TransactionsTab from '@/components/TransactionsTab.vue'
+import CategoriesTab from '@/components/CategoriesTab.vue'
+import TimelineTab from '@/components/TimelineTab.vue'
+import SettingsTab from '@/components/SettingsTab.vue'
+
+// Data imports
+import { categoriesData, getCategoryById, getAllCategoriesWithSubcategories } from '@/data/categories.js'
 
 export default {
   name: 'App',
   components: {
     AppIcon,
-    LoginModal
+    LoginModal,
+    DashboardTab,
+    TransactionsTab,
+    CategoriesTab,
+    TimelineTab,
+    SettingsTab
   },
   setup() {
     // Core app state
@@ -549,7 +211,6 @@ export default {
     const user = ref(null)
     const backendStatus = ref('Checking...')
     const phase = ref('1 - Transaction Import')
-    const showLoginModal = ref(false)
     const loading = ref(false)
     
     // Chat state
@@ -560,13 +221,9 @@ export default {
     const showHistory = ref(false)
     const showChat = ref(false)
     
-    // File upload state
+    // File upload and transactions state
     const transactionCount = ref(0)
     const recentUploads = ref([])
-    const fileInput = ref(null)
-    const isDragging = ref(false)
-    
-    // Transactions state
     const transactions = ref([])
     const currentPage = ref(1)
     const pageSize = ref(50)
@@ -593,7 +250,7 @@ export default {
       return `Hello, ${userName}! I'm here to help you with your financial data. You can ask questions about budgeting, upload CSV files, or explore your transaction categories.`
     })
     
-    const expenseCategories = computed(() => getAllExpenseCategories())
+    const expenseCategories = computed(() => getAllCategoriesWithSubcategories())
     
     const allCategories = computed(() => {
       const categories = []
@@ -660,6 +317,7 @@ export default {
       try {
         let headers = {}
         if (user.value) {
+          console.log('Getting token for chat message...')
           const token = await user.value.getIdToken()
           headers.Authorization = `Bearer ${token}`
         }
@@ -684,7 +342,7 @@ export default {
         
         // Handle navigation commands
         if (messageText.toLowerCase().includes('import') || messageText.toLowerCase().includes('upload')) {
-          currentTab.value = 'dashboard'
+          currentTab.value = 'transactions'
         } else if (messageText.toLowerCase().includes('categor')) {
           currentTab.value = 'categories'
         } else if (messageText.toLowerCase().includes('timeline')) {
@@ -697,16 +355,55 @@ export default {
         
       } catch (error) {
         console.error('Chat request failed:', error)
-        const errorResponse = `Error: ${error.message}. Please check if the backend is running.`
         
-        chatHistory.value.push({
-          message: messageText,
-          response: errorResponse,
-          timestamp: new Date().toLocaleTimeString()
-        })
+        // Try with token refresh if 401
+        if (error.response?.status === 401 && user.value) {
+          try {
+            console.log('Chat authentication failed - trying token refresh')
+            const newToken = await user.value.getIdToken(true) // Force refresh
+            
+            const retryResponse = await axios.post(`${API_BASE}/chat/command`, {
+              message: messageText
+            }, { 
+              headers: { Authorization: `Bearer ${newToken}` }, 
+              timeout: 15000 
+            })
+            
+            const botResponse = retryResponse.data.response
+            
+            chatHistory.value.push({
+              message: messageText,
+              response: botResponse,
+              timestamp: new Date().toLocaleTimeString()
+            })
+            
+            scrollToBottom()
+            
+          } catch (retryError) {
+            console.error('Chat retry also failed:', retryError)
+            const errorResponse = `Error: ${retryError.message}. Please check if the backend is running.`
+            
+            chatHistory.value.push({
+              message: messageText,
+              response: errorResponse,
+              timestamp: new Date().toLocaleTimeString()
+            })
 
-        scrollToBottom()
-        chatInput.value = originalInput
+            scrollToBottom()
+            chatInput.value = originalInput
+          }
+        } else {
+          const errorResponse = `Error: ${error.message}. Please check if the backend is running.`
+          
+          chatHistory.value.push({
+            message: messageText,
+            response: errorResponse,
+            timestamp: new Date().toLocaleTimeString()
+          })
+
+          scrollToBottom()
+          chatInput.value = originalInput
+        }
       } finally {
         loading.value = false
         currentThinking.value = ''
@@ -726,104 +423,19 @@ export default {
       }
     }
 
-    // File handling functions
-    const triggerFileUpload = () => {
-      fileInput.value?.click()
-    }
-
-    const handleFileSelect = (event) => {
-      const files = event.target.files
-      processFiles(files)
-    }
-
-    const handleFileDrop = (event) => {
-      isDragging.value = false
-      const files = event.dataTransfer.files
-      processFiles(files)
-    }
-
-    const processFiles = async (files) => {
-      if (!files || files.length === 0) return
-      
-      if (!user.value) {
-        showLoginModal.value = true
-        return
-      }
-
-      for (const file of Array.from(files)) {
-        console.log('Processing file:', file.name)
-        
-        const upload = {
-          id: Date.now() + Math.random(),
-          filename: file.name,
-          status: 'processing',
-          rows: 0,
-          timestamp: new Date().toLocaleTimeString()
-        }
-        
-        recentUploads.value.unshift(upload)
-        
-        try {
-          const formData = new FormData()
-          formData.append('file', file)
-          formData.append('account_name', 'Default Account')
-          formData.append('account_type', 'checking')
-          
-          const token = await user.value.getIdToken()
-          const response = await axios.post(`${API_BASE}/transactions/import`, formData, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'multipart/form-data'
-            }
-          })
-          
-          upload.status = 'success'
-          upload.rows = response.data.summary.rows_inserted || 0
-          transactionCount.value += upload.rows
-          
-          // Add success message to chat
-          chatHistory.value.push({
-            message: `File uploaded: ${file.name}`,
-            response: `Successfully processed ${file.name} with ${upload.rows} transactions imported!`,
-            timestamp: new Date().toLocaleTimeString()
-          })
-          
-          showHistory.value = true
-          scrollToBottom()
-          showWelcomeMessage.value = false
-          
-          // Refresh transactions if on that tab
-          if (currentTab.value === 'transactions') {
-            loadTransactions()
-          }
-          
-        } catch (error) {
-          upload.status = 'error'
-          console.error('Upload failed:', error)
-          
-          chatHistory.value.push({
-            message: `File upload: ${file.name}`,
-            response: `Upload failed: ${error.response?.data?.detail || error.message}`,
-            timestamp: new Date().toLocaleTimeString()
-          })
-          
-          showHistory.value = true
-          scrollToBottom()
-        }
-      }
-    }
-
-    const showSampleData = () => {
-      sendMessage('show me sample CSV format')
-    }
-
     // Transaction functions
     const loadTransactions = async () => {
-      if (!user.value) return
+      if (!user.value) {
+        console.log('No user logged in, cannot load transactions')
+        return
+      }
       
       loading.value = true
       try {
+        console.log('Getting ID token for user:', user.value.email)
         const token = await user.value.getIdToken()
+        console.log('Got token, making request...')
+        
         const params = new URLSearchParams({
           page: currentPage.value,
           limit: pageSize.value,
@@ -840,8 +452,35 @@ export default {
         })
         
         transactions.value = response.data
+        console.log('Loaded transactions:', response.data.length)
       } catch (error) {
         console.error('Failed to load transactions:', error)
+        if (error.response?.status === 401) {
+          console.error('Authentication failed - token may be expired')
+          try {
+            const newToken = await user.value.getIdToken(true) // Force refresh
+            console.log('Refreshed token, retrying...')
+            const params = new URLSearchParams({
+              page: currentPage.value,
+              limit: pageSize.value,
+              ...(filters.value.startDate && { start_date: filters.value.startDate }),
+              ...(filters.value.endDate && { end_date: filters.value.endDate }),
+              ...(filters.value.merchant && { merchant: filters.value.merchant }),
+              ...(filters.value.categoryId && { category_id: filters.value.categoryId }),
+              ...(filters.value.minAmount && { min_amount: filters.value.minAmount }),
+              ...(filters.value.maxAmount && { max_amount: filters.value.maxAmount })
+            })
+            
+            const retryResponse = await axios.get(`${API_BASE}/transactions/list?${params}`, {
+              headers: { 'Authorization': `Bearer ${newToken}` }
+            })
+            
+            transactions.value = retryResponse.data
+            console.log('Retry successful, loaded transactions:', retryResponse.data.length)
+          } catch (retryError) {
+            console.error('Retry also failed:', retryError)
+          }
+        }
       } finally {
         loading.value = false
       }
@@ -861,7 +500,9 @@ export default {
       if (!user.value || !categoryId) return
       
       try {
+        console.log('Categorizing transaction:', transactionId, 'as', categoryId)
         const token = await user.value.getIdToken()
+        
         await axios.post(`${API_BASE}/transactions/categorize/${transactionId}`, 
           { category_id: categoryId },
           { 
@@ -886,12 +527,50 @@ export default {
         
       } catch (error) {
         console.error('Failed to categorize transaction:', error)
+        if (error.response?.status === 401) {
+          console.error('Categorization authentication failed - trying token refresh')
+          try {
+            const newToken = await user.value.getIdToken(true) // Force refresh
+            await axios.post(`${API_BASE}/transactions/categorize/${transactionId}`, 
+              { category_id: categoryId },
+              { 
+                headers: { 'Authorization': `Bearer ${newToken}` },
+                params: { category_id: categoryId }
+              }
+            )
+            
+            loadTransactions()
+            
+            const category = getCategoryById(categoryId)
+            if (category) {
+              chatHistory.value.push({
+                message: 'Transaction categorized',
+                response: `Transaction successfully categorized as ${category.name}!`,
+                timestamp: new Date().toLocaleTimeString()
+              })
+              scrollToBottom()
+            }
+          } catch (retryError) {
+            console.error('Categorization retry failed:', retryError)
+          }
+        }
       }
     }
 
     const editTransaction = (transaction) => {
       console.log('Edit transaction:', transaction)
       // TODO: Implement transaction editing
+    }
+
+    // File upload handler for TransactionsTab
+    const handleFileUpload = (files) => {
+      console.log('File upload event received:', files.length, 'files')
+      // The actual file processing will be handled in TransactionsTab component
+    }
+
+    // Update transaction count from TransactionsTab
+    const updateTransactionCount = (count) => {
+      transactionCount.value = count
     }
 
     // Category functions
@@ -926,12 +605,6 @@ export default {
     }
 
     // Auth functions
-    const handleUserClick = () => {
-      if (!user.value) {
-        showLoginModal.value = true
-      }
-    }
-
     const handleLogout = async () => {
       if (user.value) {
         try {
@@ -948,8 +621,6 @@ export default {
         } catch (error) {
           console.error('Logout error:', error)
         }
-      } else {
-        showLoginModal.value = true
       }
     }
 
@@ -961,10 +632,9 @@ export default {
         user.value = firebaseUser
         console.log('Auth state changed:', firebaseUser ? firebaseUser.email : 'signed out')
         
-        if (chatHistory.value.length === 0) {
-          const userName = firebaseUser ? 
-            (firebaseUser.displayName || firebaseUser.email.split('@')[0]) : 
-            'there'
+        // Initialize welcome message for authenticated users only
+        if (firebaseUser && chatHistory.value.length === 0) {
+          const userName = firebaseUser.displayName || firebaseUser.email.split('@')[0]
           
           chatHistory.value.push({
             response: `Hello, ${userName}! I'm here to help you with your financial data. You can ask questions about budgeting, upload CSV files, or explore your transaction categories.`,
@@ -982,7 +652,6 @@ export default {
       user,
       backendStatus,
       phase,
-      showLoginModal,
       loading,
       
       // Chat state
@@ -994,13 +663,9 @@ export default {
       showChat,
       welcomeText,
       
-      // File upload state
+      // File upload and transaction state
       transactionCount,
       recentUploads,
-      fileInput,
-      isDragging,
-      
-      // Transaction state
       transactions,
       currentPage,
       pageSize,
@@ -1016,20 +681,18 @@ export default {
       toggleHistory,
       sendMessage,
       scrollToBottom,
-      triggerFileUpload,
-      handleFileSelect,
-      handleFileDrop,
       loadTransactions,
       refreshTransactions,
       changePage,
       categorizeTransaction,
       editTransaction,
+      handleFileUpload,
+      updateTransactionCount,
       selectCategory,
       getCategoryIcon,
       formatDate,
       formatAmount,
       showTab,
-      handleUserClick,
       handleLogout
     }
   }
