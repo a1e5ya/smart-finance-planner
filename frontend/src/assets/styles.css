@@ -284,7 +284,7 @@ margin: 0;
 
 .main-content.chat-open {
   padding-bottom: 50vh; /* Space for expanded chat */
-  max-height: calc(100vh - var(--topbar-height) - 50vh);
+  max-height: calc(100vh - var(--topbar-height) - 10rem);
 }
 
 
@@ -416,7 +416,7 @@ margin: 0;
 .chat-history-simple {
   flex: 1;
   overflow-y: auto;
-  max-height: 35vh;
+  max-height: 10rem;
 }
 
 .chat-messages-simple {

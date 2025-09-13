@@ -8,38 +8,29 @@ import re
 from io import StringIO, BytesIO
 
 class CSVProcessor:
-    """Process CSV files from various banks and financial institutions"""
+    """Process CSV files with the specific format from your sample data"""
     
-    # Common column mappings for different banks
-    COLUMN_MAPPINGS = {
-        "chase": {
-            "date": ["Transaction Date", "Date"],
-            "amount": ["Amount"],
-            "merchant": ["Description"],
-            "memo": ["Details", "Memo"],
-            "account": ["Account"]
-        },
-        "bank_of_america": {
-            "date": ["Date"],
-            "amount": ["Amount"],
-            "merchant": ["Description"],
-            "memo": ["Details"],
-            "account": ["Account"]
-        },
-        "wells_fargo": {
-            "date": ["Date"],
-            "amount": ["Amount"],
-            "merchant": ["Description"],
-            "memo": ["Details"],
-            "account": ["Account"]
-        },
-        "generic": {
-            "date": ["date", "transaction_date", "posted_date", "Date", "Transaction Date"],
-            "amount": ["amount", "Amount", "Debit", "Credit"],
-            "merchant": ["description", "merchant", "Description", "Merchant", "Payee"],
-            "memo": ["memo", "details", "Memo", "Details", "Notes"],
-            "account": ["account", "Account", "Account Name"]
-        }
+    # Expected columns from your sample CSV
+    EXPECTED_COLUMNS = {
+        "date": "Date",
+        "amount": "Amount", 
+        "merchant": "Merchant",
+        "message": "Message",
+        "full_description": "Full_Description",
+        "main_category": "Main_Category",
+        "category": "Category",
+        "subcategory": "Subcategory",
+        "account": "Account",
+        "owner": "Owner",
+        "account_type": "Account_Type",
+        "amount_abs": "Amount_Abs",
+        "is_expense": "Is_Expense",
+        "is_income": "Is_Income",
+        "year": "Year",
+        "month": "Month",
+        "year_month": "Year_Month",
+        "weekday": "Weekday",
+        "transfer_pair_id": "Transfer_Pair_ID"
     }
     
     # Date formats to try
@@ -59,20 +50,6 @@ class CSVProcessor:
     def __init__(self):
         self.errors = []
         self.warnings = []
-    
-    def detect_bank_format(self, df: pd.DataFrame) -> str:
-        """Detect the bank format based on column names"""
-        columns = [col.lower().strip() for col in df.columns]
-        
-        # Check for specific bank patterns
-        if any("chase" in col for col in columns):
-            return "chase"
-        elif any("bank of america" in col for col in columns):
-            return "bank_of_america"
-        elif any("wells fargo" in col for col in columns):
-            return "wells_fargo"
-        else:
-            return "generic"
     
     def parse_csv_file(self, file_content: Union[str, bytes], filename: str) -> pd.DataFrame:
         """Parse CSV file content into a pandas DataFrame"""
@@ -96,50 +73,31 @@ class CSVProcessor:
             if df is None or len(df.columns) <= 1:
                 raise ValueError("Could not parse CSV file with any common separator")
             
-            # Clean column names
+            # Clean column names - remove extra whitespace
             df.columns = [col.strip() for col in df.columns]
             
             # Remove empty rows
             df = df.dropna(how='all')
+            
+            # Validate required columns exist
+            missing_columns = []
+            for key, expected_col in self.EXPECTED_COLUMNS.items():
+                if expected_col not in df.columns:
+                    missing_columns.append(expected_col)
+            
+            if missing_columns:
+                self.warnings.append(f"Missing expected columns: {missing_columns}")
+                # Check if we have at least the basic required columns
+                required_basic = ["Date", "Amount", "Merchant"]
+                missing_basic = [col for col in required_basic if col not in df.columns]
+                if missing_basic:
+                    raise ValueError(f"Missing required columns: {missing_basic}")
             
             return df
             
         except Exception as e:
             self.errors.append(f"Failed to parse CSV: {str(e)}")
             raise ValueError(f"CSV parsing failed: {str(e)}")
-    
-    def map_columns(self, df: pd.DataFrame, bank_format: str) -> Dict[str, str]:
-        """Map CSV columns to our standard field names"""
-        mappings = self.COLUMN_MAPPINGS.get(bank_format, self.COLUMN_MAPPINGS["generic"])
-        result = {}
-        
-        df_columns = [col.strip() for col in df.columns]
-        
-        for field, possible_names in mappings.items():
-            mapped_column = None
-            
-            # Try exact matches first
-            for col_name in possible_names:
-                if col_name in df_columns:
-                    mapped_column = col_name
-                    break
-            
-            # Try case-insensitive partial matches
-            if not mapped_column:
-                for col_name in possible_names:
-                    for df_col in df_columns:
-                        if col_name.lower() in df_col.lower():
-                            mapped_column = df_col
-                            break
-                    if mapped_column:
-                        break
-            
-            if mapped_column:
-                result[field] = mapped_column
-            else:
-                self.warnings.append(f"Could not find column for {field}")
-        
-        return result
     
     def normalize_date(self, date_str: str) -> Optional[datetime]:
         """Normalize date string to datetime object"""
@@ -157,9 +115,9 @@ class CSVProcessor:
         self.warnings.append(f"Could not parse date: {date_str}")
         return None
     
-    def normalize_amount(self, amount_str: str) -> Optional[Decimal]:
-        """Normalize amount string to Decimal"""
-        if pd.isna(amount_str) or not amount_str:
+    def normalize_amount(self, amount_str: Union[str, int, float]) -> Optional[Decimal]:
+        """Normalize amount to Decimal"""
+        if pd.isna(amount_str) or amount_str == '':
             return None
         
         # Convert to string and clean
@@ -173,7 +131,7 @@ class CSVProcessor:
             amount_str = '-' + amount_str[1:-1]
         
         try:
-            return Decimal(amount_str)
+            return Decimal(str(amount_str))
         except:
             self.warnings.append(f"Could not parse amount: {amount_str}")
             return None
@@ -194,6 +152,38 @@ class CSVProcessor:
         
         return merchant[:255]  # Limit length
     
+    def normalize_boolean(self, value: Union[str, bool, int]) -> bool:
+        """Normalize boolean values from CSV"""
+        if pd.isna(value):
+            return False
+        
+        if isinstance(value, bool):
+            return value
+        
+        if isinstance(value, (int, float)):
+            return bool(value)
+        
+        if isinstance(value, str):
+            value = value.strip().lower()
+            return value in ['true', '1', 'yes', 'y', 't']
+        
+        return False
+    
+    def map_transaction_type(self, is_income: bool, is_expense: bool, amount: Decimal) -> str:
+        """Determine transaction type based on flags and amount"""
+        if is_income:
+            return "income"
+        elif is_expense:
+            return "expense"
+        else:
+            # Fallback to amount-based detection
+            if amount > 0:
+                return "income"
+            elif amount < 0:
+                return "expense"
+            else:
+                return "transfer"
+    
     def generate_hash(self, user_id: str, date: datetime, amount: Decimal, merchant: str, memo: str = "") -> str:
         """Generate hash for deduplication"""
         content = f"{user_id}_{date.strftime('%Y-%m-%d')}_{amount}_{merchant}_{memo}"
@@ -201,41 +191,81 @@ class CSVProcessor:
     
     def process_transactions(self, df: pd.DataFrame, user_id: str, account_id: str = None) -> List[Dict]:
         """Process DataFrame into transaction dictionaries"""
-        bank_format = self.detect_bank_format(df)
-        column_map = self.map_columns(df, bank_format)
-        
-        if not column_map.get('date') or not column_map.get('amount'):
-            raise ValueError("Required columns (date, amount) not found in CSV")
-        
         transactions = []
         batch_id = str(uuid.uuid4())
         
         for index, row in df.iterrows():
             try:
-                # Extract and normalize data
-                date = self.normalize_date(row.get(column_map.get('date')))
-                amount = self.normalize_amount(row.get(column_map.get('amount')))
-                merchant = self.normalize_merchant(row.get(column_map.get('merchant', ''), ''))
-                memo = str(row.get(column_map.get('memo', ''), '')).strip()[:500]
+                # Extract and normalize core data
+                date_val = row.get('Date', '')
+                amount_val = row.get('Amount', 0)
+                merchant_val = row.get('Merchant', '')
+                message_val = row.get('Message', '')
+                full_desc_val = row.get('Full_Description', '')
+                
+                # Parse values
+                date = self.normalize_date(date_val)
+                amount = self.normalize_amount(amount_val)
+                merchant = self.normalize_merchant(merchant_val)
                 
                 if not date or amount is None:
                     self.warnings.append(f"Row {index + 1}: Missing date or amount")
                     continue
                 
+                # Extract additional fields
+                main_category = str(row.get('Main_Category', '')).strip()
+                category = str(row.get('Category', '')).strip() 
+                subcategory = str(row.get('Subcategory', '')).strip()
+                account = str(row.get('Account', '')).strip()
+                owner = str(row.get('Owner', '')).strip()
+                account_type = str(row.get('Account_Type', '')).strip()
+                
+                # Boolean fields
+                is_expense = self.normalize_boolean(row.get('Is_Expense', False))
+                is_income = self.normalize_boolean(row.get('Is_Income', False))
+                
+                # Determine transaction type
+                transaction_type = self.map_transaction_type(is_income, is_expense, amount)
+                
+                # Create memo from available text fields
+                memo_parts = []
+                if message_val and str(message_val).strip():
+                    memo_parts.append(str(message_val).strip())
+                if full_desc_val and str(full_desc_val).strip() and str(full_desc_val).strip() != str(message_val).strip():
+                    memo_parts.append(str(full_desc_val).strip())
+                memo = " | ".join(memo_parts)[:500]  # Limit length
+                
                 # Generate deduplication hash
                 hash_dedupe = self.generate_hash(user_id, date, amount, merchant, memo)
                 
+                # Build transaction object
                 transaction = {
                     'user_id': user_id,
                     'account_id': account_id,
                     'posted_at': date,
                     'amount': amount,
-                    'currency': 'USD',  # Default, could be detected
+                    'currency': 'USD',  # Default, could be detected from data
                     'merchant': merchant,
                     'memo': memo,
                     'import_batch_id': batch_id,
                     'hash_dedupe': hash_dedupe,
-                    'source_category': 'user'
+                    'source_category': 'imported',
+                    
+                    # Extended fields from CSV
+                    'transaction_type': transaction_type,
+                    'main_category': main_category,
+                    'csv_category': category,
+                    'csv_subcategory': subcategory,
+                    'csv_account': account,
+                    'owner': owner,
+                    'csv_account_type': account_type,
+                    'is_expense': is_expense,
+                    'is_income': is_income,
+                    'year': int(row.get('Year', date.year)) if pd.notna(row.get('Year')) else date.year,
+                    'month': int(row.get('Month', date.month)) if pd.notna(row.get('Month')) else date.month,
+                    'year_month': str(row.get('Year_Month', f"{date.year}-{date.month:02d}")).strip(),
+                    'weekday': str(row.get('Weekday', date.strftime('%A'))).strip(),
+                    'transfer_pair_id': row.get('Transfer_Pair_ID', None) if pd.notna(row.get('Transfer_Pair_ID')) else None
                 }
                 
                 transactions.append(transaction)
@@ -248,6 +278,17 @@ class CSVProcessor:
     
     def get_processing_summary(self, total_rows: int, processed_transactions: List[Dict]) -> Dict:
         """Get summary of processing results"""
+        # Analyze transaction types
+        type_counts = {}
+        category_counts = {}
+        
+        for trans in processed_transactions:
+            trans_type = trans.get('transaction_type', 'unknown')
+            type_counts[trans_type] = type_counts.get(trans_type, 0) + 1
+            
+            main_cat = trans.get('main_category', 'uncategorized')
+            category_counts[main_cat] = category_counts.get(main_cat, 0) + 1
+        
         return {
             "total_rows": total_rows,
             "processed_rows": len(processed_transactions),
@@ -255,7 +296,13 @@ class CSVProcessor:
             "warnings": len(self.warnings),
             "error_messages": self.errors,
             "warning_messages": self.warnings,
-            "success_rate": len(processed_transactions) / total_rows if total_rows > 0 else 0
+            "success_rate": len(processed_transactions) / total_rows if total_rows > 0 else 0,
+            "transaction_types": type_counts,
+            "category_distribution": category_counts,
+            "date_range": {
+                "earliest": min(t['posted_at'] for t in processed_transactions).isoformat() if processed_transactions else None,
+                "latest": max(t['posted_at'] for t in processed_transactions).isoformat() if processed_transactions else None
+            }
         }
 
 def process_csv_upload(file_content: Union[str, bytes], filename: str, user_id: str, account_id: str = None) -> Tuple[List[Dict], Dict]:
@@ -282,6 +329,9 @@ def process_csv_upload(file_content: Union[str, bytes], filename: str, user_id: 
             "warnings": 0,
             "error_messages": [str(e)],
             "warning_messages": [],
-            "success_rate": 0
+            "success_rate": 0,
+            "transaction_types": {},
+            "category_distribution": {},
+            "date_range": {"earliest": None, "latest": None}
         }
         return [], summary
