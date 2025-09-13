@@ -10,7 +10,7 @@ import io
 
 from ..models.database import get_db, Transaction, Account, Category, ImportBatch, AuditLog
 from ..services.csv_processor import process_csv_upload
-from .auth import get_current_user
+from .auth import get_current_user  # Use the same auth function
 from ..models.database import User
 
 router = APIRouter()
@@ -51,12 +51,15 @@ async def import_transactions(
     account_name: Optional[str] = Form(None),
     account_type: Optional[str] = Form("checking"),
     current_user: Optional[User] = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    request: Request = None
+    db: AsyncSession = Depends(get_db)
 ):
     """Import transactions from CSV file"""
     
+    print(f"📤 Import request received: {file.filename}")
+    print(f"👤 Current user: {current_user.email if current_user else 'None'}")
+    
     if not current_user:
+        print("❌ No authenticated user for import")
         raise HTTPException(status_code=401, detail="Authentication required")
     
     # Validate file
@@ -67,6 +70,8 @@ async def import_transactions(
         raise HTTPException(status_code=400, detail="File too large (max 10MB)")
     
     try:
+        print(f"📁 Processing file: {file.filename} ({file.size} bytes)")
+        
         # Read file content
         file_content = await file.read()
         
@@ -80,6 +85,8 @@ async def import_transactions(
         db.add(import_batch)
         await db.commit()
         await db.refresh(import_batch)
+        
+        print(f"✅ Created import batch: {import_batch.id}")
         
         # Find or create account
         account = None
@@ -100,14 +107,18 @@ async def import_transactions(
                 db.add(account)
                 await db.commit()
                 await db.refresh(account)
+                print(f"✅ Created new account: {account.name}")
         
         # Process CSV
+        print("🔄 Processing CSV data...")
         transactions_data, summary = process_csv_upload(
             file_content, 
             file.filename, 
             str(current_user.id),
             str(account.id) if account else None
         )
+        
+        print(f"📊 CSV processing summary: {summary}")
         
         # Insert transactions
         inserted_count = 0
@@ -155,25 +166,7 @@ async def import_transactions(
         
         await db.commit()
         
-        # Log the import
-        audit = AuditLog(
-            user_id=current_user.id,
-            firebase_uid=current_user.firebase_uid,
-            entity="transaction",
-            action="import",
-            details={
-                "filename": file.filename,
-                "rows_imported": inserted_count,
-                "rows_duplicated": duplicate_count,
-                "total_rows": summary.get('total_rows', 0),
-                "account_name": account_name,
-                "batch_id": str(import_batch.id)
-            },
-            ip_address=getattr(request.client, 'host', None) if hasattr(request, 'client') else None,
-            user_agent=request.headers.get('user-agent', None) if hasattr(request, 'headers') else None
-        )
-        db.add(audit)
-        await db.commit()
+        print(f"✅ Import completed: {inserted_count} imported, {duplicate_count} duplicates")
         
         # Prepare response
         summary.update({
@@ -190,28 +183,14 @@ async def import_transactions(
         )
         
     except Exception as e:
+        print(f"❌ Import failed: {e}")
+        
         # Update import batch with error
         if 'import_batch' in locals():
             import_batch.status = "failed"
             import_batch.error_message = str(e)
             import_batch.completed_at = datetime.utcnow()
             await db.commit()
-        
-        # Log the error
-        audit = AuditLog(
-            user_id=current_user.id if current_user else None,
-            firebase_uid=current_user.firebase_uid if current_user else None,
-            entity="transaction",
-            action="import_error",
-            details={
-                "filename": file.filename,
-                "error": str(e)
-            },
-            ip_address=getattr(request.client, 'host', None) if hasattr(request, 'client') else None,
-            user_agent=request.headers.get('user-agent', None) if hasattr(request, 'headers') else None
-        )
-        db.add(audit)
-        await db.commit()
         
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
 
@@ -231,7 +210,11 @@ async def list_transactions(
 ):
     """Get paginated list of transactions with filters"""
     
+    print(f"📋 Transaction list request: page={page}, limit={limit}")
+    print(f"👤 Current user: {current_user.email if current_user else 'None'}")
+    
     if not current_user:
+        print("❌ No authenticated user for transaction list")
         raise HTTPException(status_code=401, detail="Authentication required")
     
     # Build query with filters
@@ -261,6 +244,8 @@ async def list_transactions(
     query = query.options(selectinload(Transaction.category))
     result = await db.execute(query)
     transactions = result.scalars().all()
+    
+    print(f"✅ Found {len(transactions)} transactions")
     
     # Convert to response format
     response_data = []
@@ -393,24 +378,6 @@ async def categorize_transaction(
     
     await db.commit()
     
-    # Log the categorization
-    audit = AuditLog(
-        user_id=current_user.id,
-        firebase_uid=current_user.firebase_uid,
-        entity="transaction",
-        action="categorize",
-        details={
-            "transaction_id": transaction_id,
-            "old_category_id": str(old_category_id) if old_category_id else None,
-            "new_category_id": category_id,
-            "category_name": category.name,
-            "merchant": transaction.merchant,
-            "amount": str(transaction.amount)
-        }
-    )
-    db.add(audit)
-    await db.commit()
-    
     return {
         "success": True,
         "message": f"Transaction categorized as {category.name}"
@@ -455,21 +422,6 @@ async def delete_import_batch(
     
     # Delete the batch
     await db.delete(batch)
-    await db.commit()
-    
-    # Log the deletion
-    audit = AuditLog(
-        user_id=current_user.id,
-        firebase_uid=current_user.firebase_uid,
-        entity="transaction",
-        action="batch_delete",
-        details={
-            "batch_id": batch_id,
-            "filename": batch.filename,
-            "deleted_transactions": len(transactions)
-        }
-    )
-    db.add(audit)
     await db.commit()
     
     return {

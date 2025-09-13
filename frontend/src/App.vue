@@ -72,7 +72,7 @@
       </div>
 
       <!-- Main Content -->
-      <div class="main-content" :class="{ 'chat-open': showChat }">
+      <div class="main-content" :class="{ 'chat-open': showHistory && chatHistory.length > 0 }">
         
         <!-- Dashboard Tab -->
         <DashboardTab v-if="currentTab === 'dashboard'" />
@@ -95,6 +95,8 @@
           @categorize-transaction="categorizeTransaction"
           @edit-transaction="editTransaction"
           @update-transaction-count="updateTransactionCount"
+          @update-filters="updateFilters"
+          @add-chat-message="addChatMessage"
         />
 
         <!-- Categories Tab -->
@@ -129,7 +131,7 @@
         <div v-if="chatHistory.length > 0 && showHistory" class="chat-history-simple">
           <div class="chat-messages-simple">
             <div v-for="(item, index) in chatHistory" :key="index" class="message-pair-simple">
-              <div class="message user-message-simple">
+              <div v-if="item.message" class="message user-message-simple">
                 <div class="message-content-simple">{{ item.message }}</div>
               </div>
               <div class="message bot-message-simple">
@@ -256,8 +258,13 @@ export default {
       const categories = []
       for (const mainCat of categoriesData) {
         categories.push(mainCat)
-        if (mainCat.children) {
-          categories.push(...mainCat.children)
+        if (mainCat.categories) {
+          for (const cat of mainCat.categories) {
+            categories.push(cat)
+            if (cat.children) {
+              categories.push(...cat.children)
+            }
+          }
         }
       }
       return categories
@@ -302,6 +309,21 @@ export default {
       }, 100)
     }
 
+    const addChatMessage = (messageData) => {
+      chatHistory.value.push({
+        message: messageData.message || '',
+        response: messageData.response,
+        timestamp: new Date().toLocaleTimeString()
+      })
+      
+      showHistory.value = true
+      scrollToBottom()
+      
+      if (chatHistory.value.length > 20) {
+        chatHistory.value = chatHistory.value.slice(-20)
+      }
+    }
+
     const sendMessage = async (message = null) => {
       const messageText = message || chatInput.value.trim()
       if (!messageText || loading.value) return
@@ -317,28 +339,24 @@ export default {
       try {
         let headers = {}
         if (user.value) {
-          console.log('Getting token for chat message...')
+          console.log('🎯 Getting token for chat message...')
           const token = await user.value.getIdToken()
           headers.Authorization = `Bearer ${token}`
+          console.log('✅ Got token for chat')
         }
 
+        console.log('📤 Sending chat message:', messageText.substring(0, 50))
         const response = await axios.post(`${API_BASE}/chat/command`, {
           message: messageText
         }, { headers, timeout: 15000 })
         
+        console.log('📥 Chat response received:', response.data)
         const botResponse = response.data.response
         
-        chatHistory.value.push({
+        addChatMessage({
           message: messageText,
-          response: botResponse,
-          timestamp: new Date().toLocaleTimeString()
+          response: botResponse
         })
-        
-        scrollToBottom()
-        
-        if (chatHistory.value.length > 20) {
-          chatHistory.value = chatHistory.value.slice(-20)
-        }
         
         // Handle navigation commands
         if (messageText.toLowerCase().includes('import') || messageText.toLowerCase().includes('upload')) {
@@ -354,56 +372,56 @@ export default {
         }
         
       } catch (error) {
-        console.error('Chat request failed:', error)
+        console.error('❌ Chat request failed:', error)
         
-        // Try with token refresh if 401
-        if (error.response?.status === 401 && user.value) {
-          try {
-            console.log('Chat authentication failed - trying token refresh')
-            const newToken = await user.value.getIdToken(true) // Force refresh
-            
-            const retryResponse = await axios.post(`${API_BASE}/chat/command`, {
-              message: messageText
-            }, { 
-              headers: { Authorization: `Bearer ${newToken}` }, 
-              timeout: 15000 
-            })
-            
-            const botResponse = retryResponse.data.response
-            
-            chatHistory.value.push({
-              message: messageText,
-              response: botResponse,
-              timestamp: new Date().toLocaleTimeString()
-            })
-            
-            scrollToBottom()
-            
-          } catch (retryError) {
-            console.error('Chat retry also failed:', retryError)
-            const errorResponse = `Error: ${retryError.message}. Please check if the backend is running.`
-            
-            chatHistory.value.push({
-              message: messageText,
-              response: errorResponse,
-              timestamp: new Date().toLocaleTimeString()
-            })
-
-            scrollToBottom()
-            chatInput.value = originalInput
+        // Enhanced error handling
+        let errorMessage = 'Sorry, I encountered an error. Please try again.'
+        
+        if (error.response?.status === 401) {
+          console.log('🔄 Authentication failed - trying token refresh')
+          if (user.value) {
+            try {
+              const newToken = await user.value.getIdToken(true) // Force refresh
+              console.log('✅ Token refreshed, retrying chat...')
+              
+              const retryResponse = await axios.post(`${API_BASE}/chat/command`, {
+                message: messageText
+              }, { 
+                headers: { Authorization: `Bearer ${newToken}` }, 
+                timeout: 15000 
+              })
+              
+              console.log('📥 Chat retry response:', retryResponse.data)
+              const botResponse = retryResponse.data.response
+              
+              addChatMessage({
+                message: messageText,
+                response: botResponse
+              })
+              
+              loading.value = false
+              currentThinking.value = ''
+              return // Success, exit function
+              
+            } catch (retryError) {
+              console.error('❌ Chat retry failed:', retryError)
+              errorMessage = 'Authentication failed. Please try signing out and back in.'
+            }
+          } else {
+            errorMessage = 'Please sign in to use the chat feature.'
           }
-        } else {
-          const errorResponse = `Error: ${error.message}. Please check if the backend is running.`
-          
-          chatHistory.value.push({
-            message: messageText,
-            response: errorResponse,
-            timestamp: new Date().toLocaleTimeString()
-          })
-
-          scrollToBottom()
-          chatInput.value = originalInput
+        } else if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+          errorMessage = 'Unable to connect to the server. Please check if the backend is running.'
+        } else if (error.response?.status >= 500) {
+          errorMessage = 'Server error occurred. Please try again in a moment.'
         }
+        
+        addChatMessage({
+          message: messageText,
+          response: errorMessage
+        })
+        
+        chatInput.value = originalInput // Restore input on error
       } finally {
         loading.value = false
         currentThinking.value = ''
@@ -413,28 +431,28 @@ export default {
     // Backend health check
     const checkBackend = async () => {
       try {
+        console.log('🔍 Checking backend connection...')
         const response = await axios.get(`${API_BASE}/health`, { timeout: 10000 })
         backendStatus.value = 'Connected'
         phase.value = response.data.phase || 'Phase 1'
         console.log('✅ Backend connected:', response.data)
       } catch (error) {
         backendStatus.value = 'Disconnected'
-        console.error('Backend connection failed:', error)
+        console.error('❌ Backend connection failed:', error)
       }
     }
 
     // Transaction functions
     const loadTransactions = async () => {
       if (!user.value) {
-        console.log('No user logged in, cannot load transactions')
+        console.log('⚠️ No user logged in, cannot load transactions')
         return
       }
       
       loading.value = true
       try {
-        console.log('Getting ID token for user:', user.value.email)
+        console.log('🔑 Getting token for transactions...')
         const token = await user.value.getIdToken()
-        console.log('Got token, making request...')
         
         const params = new URLSearchParams({
           page: currentPage.value,
@@ -447,19 +465,19 @@ export default {
           ...(filters.value.maxAmount && { max_amount: filters.value.maxAmount })
         })
         
+        console.log('📤 Loading transactions with params:', params.toString())
         const response = await axios.get(`${API_BASE}/transactions/list?${params}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         
         transactions.value = response.data
-        console.log('Loaded transactions:', response.data.length)
+        console.log('✅ Loaded transactions:', response.data.length)
       } catch (error) {
-        console.error('Failed to load transactions:', error)
+        console.error('❌ Failed to load transactions:', error)
         if (error.response?.status === 401) {
-          console.error('Authentication failed - token may be expired')
+          console.log('🔄 Transaction auth failed - trying token refresh')
           try {
             const newToken = await user.value.getIdToken(true) // Force refresh
-            console.log('Refreshed token, retrying...')
             const params = new URLSearchParams({
               page: currentPage.value,
               limit: pageSize.value,
@@ -476,9 +494,9 @@ export default {
             })
             
             transactions.value = retryResponse.data
-            console.log('Retry successful, loaded transactions:', retryResponse.data.length)
+            console.log('✅ Transaction retry successful:', retryResponse.data.length)
           } catch (retryError) {
-            console.error('Retry also failed:', retryError)
+            console.error('❌ Transaction retry failed:', retryError)
           }
         }
       } finally {
@@ -496,11 +514,15 @@ export default {
       loadTransactions()
     }
 
+    const updateFilters = (newFilters) => {
+      filters.value = newFilters
+    }
+
     const categorizeTransaction = async (transactionId, categoryId) => {
       if (!user.value || !categoryId) return
       
       try {
-        console.log('Categorizing transaction:', transactionId, 'as', categoryId)
+        console.log('🏷️ Categorizing transaction:', transactionId, 'as', categoryId)
         const token = await user.value.getIdToken()
         
         await axios.post(`${API_BASE}/transactions/categorize/${transactionId}`, 
@@ -517,18 +539,16 @@ export default {
         // Add success message to chat
         const category = getCategoryById(categoryId)
         if (category) {
-          chatHistory.value.push({
+          addChatMessage({
             message: 'Transaction categorized',
-            response: `Transaction successfully categorized as ${category.name}!`,
-            timestamp: new Date().toLocaleTimeString()
+            response: `✅ Transaction successfully categorized as ${category.name}!`
           })
-          scrollToBottom()
         }
         
       } catch (error) {
-        console.error('Failed to categorize transaction:', error)
+        console.error('❌ Failed to categorize transaction:', error)
         if (error.response?.status === 401) {
-          console.error('Categorization authentication failed - trying token refresh')
+          console.log('🔄 Categorization auth failed - trying refresh')
           try {
             const newToken = await user.value.getIdToken(true) // Force refresh
             await axios.post(`${API_BASE}/transactions/categorize/${transactionId}`, 
@@ -543,28 +563,29 @@ export default {
             
             const category = getCategoryById(categoryId)
             if (category) {
-              chatHistory.value.push({
+              addChatMessage({
                 message: 'Transaction categorized',
-                response: `Transaction successfully categorized as ${category.name}!`,
-                timestamp: new Date().toLocaleTimeString()
+                response: `✅ Transaction successfully categorized as ${category.name}!`
               })
-              scrollToBottom()
             }
           } catch (retryError) {
-            console.error('Categorization retry failed:', retryError)
+            console.error('❌ Categorization retry failed:', retryError)
+            addChatMessage({
+              response: '❌ Failed to categorize transaction. Please try again.'
+            })
           }
         }
       }
     }
 
     const editTransaction = (transaction) => {
-      console.log('Edit transaction:', transaction)
+      console.log('✏️ Edit transaction:', transaction)
       // TODO: Implement transaction editing
     }
 
     // File upload handler for TransactionsTab
     const handleFileUpload = (files) => {
-      console.log('File upload event received:', files.length, 'files')
+      console.log('📁 File upload event received:', files.length, 'files')
       // The actual file processing will be handled in TransactionsTab component
     }
 
@@ -609,36 +630,33 @@ export default {
       if (user.value) {
         try {
           await auth.signOut()
-          chatHistory.value.push({
+          addChatMessage({
             message: 'Logout',
-            response: "You've been signed out. Sign in again for personalized features!",
-            timestamp: new Date().toLocaleTimeString()
+            response: "✅ You've been signed out. Sign in again for personalized features!"
           })
           
-          showHistory.value = true
-          scrollToBottom()
           showWelcomeMessage.value = false
         } catch (error) {
-          console.error('Logout error:', error)
+          console.error('❌ Logout error:', error)
         }
       }
     }
 
     // Initialize
     onMounted(() => {
+      console.log('🚀 App initializing...')
       checkBackend()
       
       onAuthStateChanged(auth, (firebaseUser) => {
         user.value = firebaseUser
-        console.log('Auth state changed:', firebaseUser ? firebaseUser.email : 'signed out')
+        console.log('🔐 Auth state changed:', firebaseUser ? firebaseUser.email : 'signed out')
         
         // Initialize welcome message for authenticated users only
         if (firebaseUser && chatHistory.value.length === 0) {
           const userName = firebaseUser.displayName || firebaseUser.email.split('@')[0]
           
-          chatHistory.value.push({
-            response: `Hello, ${userName}! I'm here to help you with your financial data. You can ask questions about budgeting, upload CSV files, or explore your transaction categories.`,
-            timestamp: new Date().toLocaleTimeString()
+          addChatMessage({
+            response: `Hello, ${userName}! I'm here to help you with your financial data. You can ask questions about budgeting, upload CSV files, or explore your transaction categories.`
           })
           
           showWelcomeMessage.value = false
@@ -680,10 +698,12 @@ export default {
       // Functions
       toggleHistory,
       sendMessage,
+      addChatMessage,
       scrollToBottom,
       loadTransactions,
       refreshTransactions,
       changePage,
+      updateFilters,
       categorizeTransaction,
       editTransaction,
       handleFileUpload,
@@ -698,3 +718,43 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.login-screen {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-container {
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+}
+
+.logo-section {
+  margin-bottom: 2rem;
+}
+
+.logo-section h1 {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.tagline {
+  color: var(--color-text-light);
+  font-size: var(--text-medium);
+}
+
+.authenticated-app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-info {
+  color: var(--color-text-light);
+}
+</style>

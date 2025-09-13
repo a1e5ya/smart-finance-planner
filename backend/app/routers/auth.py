@@ -48,20 +48,23 @@ class UserResponse(BaseModel):
     display_name: Optional[str]
     created_at: str
 
-# Dependency to get current user from Firebase token
+# Simplified dependency to get current user from Firebase token
 async def get_current_user(
     authorization: Optional[str] = Header(None),
-    db: AsyncSession = Depends(get_db),
-    request: Request = None
+    db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
-    """Extract user from Firebase JWT token"""
+    """Extract user from Firebase JWT token - simplified version"""
     
+    # Allow anonymous access for now - just log it
     if not authorization or not authorization.startswith("Bearer "):
+        print("⚠️ No authorization header - allowing anonymous access")
         return None
     
     token = authorization.replace("Bearer ", "")
     
     try:
+        print(f"🔑 Verifying Firebase token: {token[:20]}...")
+        
         # Get Firebase app
         app = get_firebase_app()
         
@@ -71,6 +74,8 @@ async def get_current_user(
         email = decoded_token.get('email')
         display_name = decoded_token.get('name', '')
         
+        print(f"✅ Token verified for user: {email} ({firebase_uid[:8]}...)")
+        
         # Check if user exists in our database
         result = await db.execute(
             select(User).where(User.firebase_uid == firebase_uid)
@@ -79,6 +84,7 @@ async def get_current_user(
         
         # Create user if doesn't exist
         if not user:
+            print(f"👤 Creating new user: {email}")
             user = User(
                 firebase_uid=firebase_uid,
                 email=email,
@@ -87,43 +93,21 @@ async def get_current_user(
             db.add(user)
             await db.commit()
             await db.refresh(user)
-            
-            # Log user creation
-            audit = AuditLog(
-                user_id=user.id,
-                firebase_uid=firebase_uid,
-                entity="auth",
-                action="signup",
-                details={
-                    "email": email,
-                    "display_name": display_name,
-                    "method": "firebase"
-                },
-                ip_address=getattr(request, 'client', {}).get('host') if request else None,
-                user_agent=getattr(request, 'headers', {}).get('user-agent') if request else None
-            )
-            db.add(audit)
-            await db.commit()
-            
-            print(f"👤 New user created: {email} ({firebase_uid[:8]}...)")
+            print(f"✅ User created with ID: {user.id}")
         else:
             # Update user info if changed
-            updated = False
-            if user.email != email:
+            if user.email != email or user.display_name != display_name:
+                print(f"📝 Updating user info for: {email}")
                 user.email = email
-                updated = True
-            if user.display_name != display_name:
                 user.display_name = display_name
-                updated = True
-                
-            if updated:
                 await db.commit()
                 await db.refresh(user)
         
         return user
         
     except Exception as e:
-        print(f"❌ Auth error: {e}")
+        print(f"❌ Firebase token verification failed: {e}")
+        # Don't raise exception - just return None for anonymous access
         return None
 
 @router.post("/verify", response_model=AuthResponse)
@@ -179,7 +163,8 @@ async def debug_auth(authorization: Optional[str] = Header(None)):
             "success": True,
             "uid": decoded_token['uid'],
             "email": decoded_token.get('email'),
-            "name": decoded_token.get('name')
+            "name": decoded_token.get('name'),
+            "token_preview": token[:20] + "..."
         }
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "token_preview": token[:20] + "..."}

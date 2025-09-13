@@ -61,8 +61,6 @@ class User(Base):
     firebase_uid = Column(String, unique=True, nullable=False, index=True)
     email = Column(String, nullable=True)
     display_name = Column(String, nullable=True)
-    locale = Column(String, default="en-US")
-    currency = Column(String, default="USD")
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

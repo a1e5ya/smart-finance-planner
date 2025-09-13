@@ -39,6 +39,27 @@
       </div>
     </div>
 
+    <!-- Upload Status -->
+    <div class="container" v-if="localUploads.length > 0">
+      <div class="text-medium section-header">Current Uploads</div>
+      <div class="flex-column flex-gap-sm">
+        <div v-for="upload in localUploads" :key="upload.id" class="card flex flex-gap">
+          <div class="status-icon">
+            {{ upload.status === 'success' ? '✅' : upload.status === 'error' ? '❌' : '⏳' }}
+          </div>
+          <div>
+            <div class="text-medium">{{ upload.filename }}</div>
+            <div class="text-small text-light">
+              {{ upload.timestamp }} • 
+              <span v-if="upload.status === 'processing'">Processing...</span>
+              <span v-else-if="upload.status === 'success'">{{ upload.rows }} rows imported</span>
+              <span v-else-if="upload.status === 'error'">Upload failed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Transaction Stats -->
     <div class="container" v-if="transactionCount > 0">
       <div class="grid grid-auto">
@@ -84,13 +105,6 @@
           type="date" 
           :value="filters.startDate"
           @input="updateFilter('startDate', $event.target.value)"
-          class="chat-input-always"
-          placeholder="Start Date"
-        >
-        <input 
-          type="date" 
-          :value="filters.endDate"
-          @input="updateFilter('endDate', $event.target.value)"
           class="chat-input-always"
           placeholder="End Date"
         >
@@ -192,7 +206,7 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import axios from 'axios'
 import AppIcon from './AppIcon.vue'
 
@@ -246,6 +260,7 @@ export default {
     'categorize-transaction', 
     'edit-transaction',
     'update-transaction-count',
+    'update-filters',
     'add-chat-message'
   ],
   setup(props, { emit }) {
@@ -265,6 +280,8 @@ export default {
     const handleFileSelect = (event) => {
       const files = event.target.files
       processFiles(files)
+      // Clear the input so the same file can be selected again
+      event.target.value = ''
     }
 
     const handleFileDrop = (event) => {
@@ -277,12 +294,33 @@ export default {
       if (!files || files.length === 0) return
       
       if (!props.user) {
-        console.log('No user logged in for file upload')
+        console.log('⚠️ No user logged in for file upload')
+        emit('add-chat-message', {
+          response: '❌ Please sign in to upload files.'
+        })
         return
       }
 
       for (const file of Array.from(files)) {
-        console.log('Processing file:', file.name)
+        console.log('📁 Processing file:', file.name)
+        
+        // Validate file type
+        if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.xlsx')) {
+          emit('add-chat-message', {
+            message: `File upload: ${file.name}`,
+            response: '❌ Please upload only CSV or XLSX files.'
+          })
+          continue
+        }
+
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          emit('add-chat-message', {
+            message: `File upload: ${file.name}`,
+            response: '❌ File too large. Please upload files smaller than 10MB.'
+          })
+          continue
+        }
         
         const upload = {
           id: Date.now() + Math.random(),
@@ -292,36 +330,44 @@ export default {
           timestamp: new Date().toLocaleTimeString()
         }
         
-        // Add to local uploads (will be synced to parent)
+        // Add to local uploads
         localUploads.value.unshift(upload)
         
+        // Show processing message
+        emit('add-chat-message', {
+          message: `Uploading: ${file.name}`,
+          response: `📤 Processing ${file.name}... Please wait.`
+        })
+        
         try {
-          console.log('Getting ID token for file upload...')
+          console.log('🔑 Getting token for file upload...')
           const token = await props.user.getIdToken()
-          console.log('Got token for upload, making request...')
+          console.log('✅ Token obtained, creating form data...')
           
           const formData = new FormData()
           formData.append('file', file)
           formData.append('account_name', 'Default Account')
           formData.append('account_type', 'checking')
           
+          console.log('📤 Uploading to:', `${API_BASE}/transactions/import`)
           const response = await axios.post(`${API_BASE}/transactions/import`, formData, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'multipart/form-data'
-            }
+            },
+            timeout: 60000 // 60 second timeout for file uploads
           })
           
           upload.status = 'success'
           upload.rows = response.data.summary.rows_inserted || 0
           
-          console.log('Upload successful:', upload.rows, 'rows imported')
+          console.log('✅ Upload successful:', upload.rows, 'rows imported')
           
           // Emit events to parent
           emit('update-transaction-count', props.transactionCount + upload.rows)
           emit('add-chat-message', {
             message: `File uploaded: ${file.name}`,
-            response: `Successfully processed ${file.name} with ${upload.rows} transactions imported!`
+            response: `✅ Successfully processed ${file.name} with ${upload.rows} transactions imported! ${response.data.summary.rows_duplicated || 0} duplicates were skipped.`
           })
           
           // Refresh transactions
@@ -329,13 +375,15 @@ export default {
           
         } catch (error) {
           upload.status = 'error'
-          console.error('Upload failed:', error)
+          console.error('❌ Upload failed:', error)
+          
+          let errorMessage = 'Upload failed: Unknown error'
           
           if (error.response?.status === 401) {
-            console.error('Upload authentication failed - trying token refresh')
+            console.log('🔄 Upload auth failed - trying token refresh')
             try {
               const newToken = await props.user.getIdToken(true) // Force refresh
-              console.log('Refreshed token, retrying upload...')
+              console.log('✅ Token refreshed, retrying upload...')
               
               const formData = new FormData()
               formData.append('file', file)
@@ -346,42 +394,48 @@ export default {
                 headers: {
                   'Authorization': `Bearer ${newToken}`,
                   'Content-Type': 'multipart/form-data'
-                }
+                },
+                timeout: 60000
               })
               
               upload.status = 'success'
               upload.rows = retryResponse.data.summary.rows_inserted || 0
               
-              console.log('Upload retry successful:', upload.rows, 'rows imported')
+              console.log('✅ Upload retry successful:', upload.rows, 'rows imported')
               
               emit('update-transaction-count', props.transactionCount + upload.rows)
               emit('add-chat-message', {
                 message: `File uploaded: ${file.name}`,
-                response: `Successfully processed ${file.name} with ${upload.rows} transactions imported!`
+                response: `✅ Successfully processed ${file.name} with ${upload.rows} transactions imported! ${retryResponse.data.summary.rows_duplicated || 0} duplicates were skipped.`
               })
               
               emit('refresh-transactions')
+              continue // Success, continue to next file
               
             } catch (retryError) {
-              console.error('Upload retry also failed:', retryError)
-              emit('add-chat-message', {
-                message: `File upload: ${file.name}`,
-                response: `Upload failed: ${retryError.response?.data?.detail || retryError.message}`
-              })
+              console.error('❌ Upload retry failed:', retryError)
+              errorMessage = retryError.response?.data?.detail || 'Authentication failed. Please try signing out and back in.'
             }
+          } else if (error.response?.data?.detail) {
+            errorMessage = error.response.data.detail
+          } else if (error.code === 'ECONNABORTED') {
+            errorMessage = 'Upload timeout. Please try with a smaller file.'
+          } else if (error.response?.status >= 500) {
+            errorMessage = 'Server error. Please try again later.'
           } else {
-            emit('add-chat-message', {
-              message: `File upload: ${file.name}`,
-              response: `Upload failed: ${error.response?.data?.detail || error.message}`
-            })
+            errorMessage = error.message || 'Upload failed'
           }
+          
+          emit('add-chat-message', {
+            message: `File upload: ${file.name}`,
+            response: `❌ ${errorMessage}`
+          })
         }
       }
     }
 
     // Filter update function
     const updateFilter = (filterKey, value) => {
-      // Emit filter changes to parent
       const newFilters = { ...props.filters, [filterKey]: value }
       emit('update-filters', newFilters)
     }
@@ -404,6 +458,15 @@ export default {
       // For now, return a default icon
       return 'circle'
     }
+
+    // Clean up old uploads after 30 seconds
+    watch(localUploads, () => {
+      setTimeout(() => {
+        localUploads.value = localUploads.value.filter(upload => 
+          Date.now() - upload.id < 30000 || upload.status === 'processing'
+        )
+      }, 30000)
+    }, { deep: true })
 
     return {
       // Local state
@@ -501,6 +564,17 @@ export default {
   border-color: var(--color-text);
   background: var(--color-background);
   transform: scale(1.02);
+}
+
+/* Upload status styling */
+.status-icon {
+  font-size: 1.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* Responsive adjustments */
