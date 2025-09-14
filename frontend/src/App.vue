@@ -124,11 +124,11 @@
 
       <!-- Always Visible Chat Bar -->
       <div class="chat-bar-always">
-        <div v-if="showWelcomeMessage && !chatHistory.length" class="welcome-message">
+        <div v-if="showWelcomeMessage && !chatHistory.length && showChat" class="welcome-message">
           {{ welcomeText }}
         </div>
         
-        <div v-if="chatHistory.length > 0 && showHistory" class="chat-history-simple">
+        <div v-if="chatHistory.length > 0 && showHistory && showChat" class="chat-history-simple">
           <div class="chat-messages-simple">
             <div v-for="(item, index) in chatHistory" :key="index" class="message-pair-simple">
               <div v-if="item.message" class="message user-message-simple">
@@ -141,27 +141,26 @@
           </div>
         </div>
 
-        <div v-if="currentThinking" class="current-thinking">
+        <div v-if="currentThinking && showChat" class="current-thinking">
           <div class="message bot-message-simple">
             <div class="message-content-simple">{{ currentThinking }}</div>
           </div>
         </div>
 
-        <div class="chat-input-row">
-          <button 
-            v-if="chatHistory.length > 0"
-            class="history-toggle-btn btn-link"
-            @click="toggleHistory"
-            :title="showHistory ? 'Hide History' : 'Show History'"
-          >
-            <AppIcon :name="showHistory ? 'angle-down' : 'angle-up'" size="medium" />
-          </button>
+<div class="chat-input-row">
+  <button 
+    class="history-toggle-btn btn-link"
+    @click="toggleChatPanel"
+    :title="showChat ? 'Close Chat' : 'Open Chat'"
+  >
+    <AppIcon :name="showChat ? 'angle-down' : 'angle-up'" size="medium" />
+  </button>
           <input 
             type="text" 
             class="chat-input-always" 
             v-model="chatInput"
             @keypress.enter="sendMessage()"
-            @click="showHistory = true"
+            @click="openChatPanel"
             :disabled="loading"
           >
           <button 
@@ -663,6 +662,24 @@ export default {
       })
     })
 
+        const openChatPanel = () => {
+      showChat.value = true
+      showHistory.value = true
+    }
+
+    const closeChatPanel = () => {
+      showChat.value = false
+      showHistory.value = false
+    }
+
+    const toggleChatPanel = () => {
+      if (showChat.value) {
+        closeChatPanel()
+      } else {
+        openChatPanel()
+      }
+    }
+
     return {
       // Core state
       currentTab,
@@ -696,6 +713,9 @@ export default {
       
       // Functions
       toggleHistory,
+      openChatPanel,
+      closeChatPanel,
+      toggleChatPanel,
       sendMessage,
       addChatMessage,
       scrollToBottom,

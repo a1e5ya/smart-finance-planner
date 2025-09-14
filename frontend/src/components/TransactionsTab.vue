@@ -1,77 +1,58 @@
 <template>
   <div class="tab-content">
-    <!-- Summary Stats -->
-    <div class="container" v-if="summary">
-      <div class="transactions-stats">
-        <div class="stat-card">
-          <div class="stat-label">Total Transactions</div>
-          <div class="stat-value">{{ summary.total_transactions.toLocaleString() }}</div>
-          <div class="stat-detail">{{ formatAmount(summary.total_amount) }} total volume</div>
-        </div>
-        <div class="stat-card income">
-          <div class="stat-label">Income</div>
-          <div class="stat-value">{{ formatAmount(summary.income_amount) }}</div>
-          <div class="stat-detail">{{ (summary.by_type && summary.by_type.income) || 0 }} transactions</div>
-        </div>
-        <div class="stat-card expense">
-          <div class="stat-label">Expenses</div>
-          <div class="stat-value">{{ formatAmount(summary.expense_amount) }}</div>
-          <div class="stat-detail">{{ (summary.by_type && summary.by_type.expense) || 0 }} transactions</div>
-        </div>
-        <div class="stat-card categorized">
-          <div class="stat-label">Categorized</div>
-          <div class="stat-value">{{ (summary.categorization_rate * 100).toFixed(0) }}%</div>
-          <div class="stat-detail">{{ summary.categorized_count }} of {{ summary.total_transactions }}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Import Section -->
-    <div class="container">
-      <div class="import-section">
-        <div class="import-header">
-          <h3>Import & Manage Transactions</h3>
-          <p>Upload CSV files from your bank or financial institution</p>
-        </div>
-        
-        <div 
-          class="drop-zone" 
-          @click="triggerFileUpload"
-          @drop.prevent="handleFileDrop"
-          @dragover.prevent
-          @dragenter.prevent="isDragging = true"
-          @dragleave.prevent="isDragging = false"
-          :class="{ 'drag-active': isDragging }"
-        >
-          <div class="drop-zone-content">
-            <div class="upload-text">
-              <div class="upload-title">Drag & Drop CSV Files</div>
-              <div class="upload-subtitle">Or click to browse and select files</div>
-              <div class="upload-formats">Supports: CSV, XLSX • Max: 10MB</div>
-            </div>
-          </div>
-          <input 
-            ref="fileInput" 
-            type="file" 
-            accept=".csv,.xlsx" 
-            multiple 
-            @change="handleFileSelect" 
-            style="display: none;"
+    <!-- Top Cards Section -->
+    <div class="grid grid-3">
+      <!-- Import Card -->
+      <div class="container">
+        <div class="import-section">
+          <div 
+            class="drop-zone" 
+            @click="triggerFileUpload"
+            @drop.prevent="handleFileDrop"
+            @dragover.prevent
+            @dragenter.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            :class="{ 'drag-active': isDragging }"
           >
-        </div>
-        
-        <div class="import-actions">
-          <button class="btn btn-active" @click="triggerFileUpload">
-            Choose Files
-          </button>
-          <button class="btn" @click="loadSummary" :disabled="loading">
-            Refresh Data
-          </button>
-          <button class="btn btn-danger" @click="showResetConfirmation" v-if="summary && summary.total_transactions > 0">
-            Reset All Data
-          </button>
+            <div class="drop-zone-content">
+              <div class="upload-text">
+          <div class="import-header">
+            <h3>Import Transactions</h3>
+          </div>
+              </div>
+            </div>
+            <input 
+              ref="fileInput" 
+              type="file" 
+              accept=".csv,.xlsx" 
+              multiple 
+              @change="handleFileSelect" 
+              style="display: none;"
+            >
+          </div>
         </div>
       </div>
+
+      <!-- Transaction Count Card -->
+      <div class="container stat-card">
+          <div class="stat-label">Total Transactions</div>
+          <div class="stat-value">{{ summary?.total_transactions?.toLocaleString() || 0 }}</div>
+          <div class="stat-detail">
+            <span v-if="summary?.categorized_count">
+              {{ summary.categorized_count }} categorized
+            </span>
+          </div>
+      </div>
+
+      <!-- Reset Card -->
+      <div class="container stat-card">
+          <div class="stat-detail">
+            <button class="btn btn-danger" @click="showResetModal = true" v-if="summary && summary.total_transactions > 0">
+              Reset All Data
+            </button>
+            <span v-else class="text-muted">No data to reset</span>
+          </div>
+        </div>
     </div>
 
     <!-- Upload Progress -->
@@ -93,29 +74,22 @@
                 <span v-else-if="upload.status === 'success'" class="upload-status"> • {{ upload.rows }} rows imported</span>
                 <span v-else-if="upload.status === 'error'" class="upload-status"> • Upload failed</span>
               </div>
-              <div v-if="upload.summary && upload.status === 'success'" class="upload-summary">
-                Types: {{ upload.summary.transaction_types ? Object.keys(upload.summary.transaction_types).join(', ') : '' }}
-              </div>
-            </div>
-            <div class="upload-actions" v-if="upload.batch_id && upload.status === 'success'">
-              <button class="btn btn-small btn-link" @click="showBatchDetails(upload.batch_id)">
-                Details
-              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Filters and Controls -->
+    <!-- Transactions Table with Filters -->
     <div class="container">
+      <!-- Table Header with Controls -->
       <div class="transactions-header">
         <div class="header-info">
           <h3>Transaction History</h3>
           <span class="transaction-count">({{ summary?.total_transactions || 0 }} total)</span>
         </div>
         <div class="header-actions">
-          <button class="btn btn-small" @click="toggleFilters" :class="{ 'btn-active': showFilters }">
+          <button class="btn btn-small" @click="showFilters = !showFilters" :class="{ 'btn-active': showFilters }">
             Filters {{ hasActiveFilters ? '(Active)' : '' }}
           </button>
           <button class="btn btn-small" @click="refreshTransactions" :disabled="loading">
@@ -198,24 +172,40 @@
         
         <div class="filter-actions">
           <button class="btn btn-small" @click="clearFilters">Clear Filters</button>
-          <button class="btn btn-small" @click="toggleFilters">Hide Filters</button>
+          <button class="btn btn-small" @click="showFilters = false">Hide Filters</button>
         </div>
       </div>
-    </div>
 
-    <!-- Bulk Selection (simplified) -->
-    <div class="container" v-if="selectedTransactions.length > 0">
-      <div class="bulk-actions">
+      <!-- Bulk Selection -->
+      <div class="bulk-actions" v-if="selectedTransactions.length > 0">
         <span class="bulk-selection">{{ selectedTransactions.length }} selected</span>
+        <select v-model="bulkCategoryId" class="bulk-category-select">
+          <option value="">Select category for bulk assignment...</option>
+          <optgroup 
+            v-for="group in groupedCategories" 
+            :key="group.name" 
+            :label="group.name"
+          >
+            <option 
+              v-for="category in group.categories" 
+              :key="category.id" 
+              :value="category.id"
+            >
+              {{ category.name }}
+            </option>
+          </optgroup>
+        </select>
+        <button class="btn btn-small" @click="bulkCategorize" :disabled="!bulkCategoryId">
+          Apply Category
+        </button>
         <button class="btn btn-link" @click="clearSelection">
           Clear Selection
         </button>
       </div>
-    </div>
 
-    <!-- Transactions Table -->
-    <div class="container">
+      <!-- Loading and Empty States -->
       <div v-if="loading" class="loading-state">
+        <div class="loading-spinner">⟳</div>
         <div>Loading transactions...</div>
       </div>
       
@@ -226,6 +216,7 @@
         </div>
       </div>
       
+      <!-- Transactions Table -->
       <div v-else class="transactions-table-container">
         <table class="transactions-table">
           <thead>
@@ -257,7 +248,6 @@
               </th>
               <th class="col-category">Category</th>
               <th class="col-type">Type</th>
-              <th class="col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -267,7 +257,8 @@
               class="transaction-row"
               :class="{ 
                 'uncategorized': !transaction.category_name,
-                'selected': selectedTransactions.includes(transaction.id)
+                'selected': selectedTransactions.includes(transaction.id),
+                'auto-categorizing': categorizingTransactions.includes(transaction.id)
               }"
             >
               <td class="col-select">
@@ -296,18 +287,48 @@
               
               <td class="col-amount" :class="getAmountClass(transaction)">
                 <div class="amount-primary">{{ formatAmount(transaction.amount) }}</div>
-                <div class="amount-secondary" v-if="transaction.owner">{{ transaction.owner }}</div>
+                <div class="amount-secondary" v-if="transaction.transfer_pair_id">
+                  Transfer: {{ transaction.transfer_pair_id }}
+                </div>
               </td>
               
               <td class="col-category">
+                <!-- Show assigned category with edit button -->
                 <div v-if="transaction.category_name" class="category-assigned">
                   <span class="category-name">{{ transaction.category_name }}</span>
+                  <button 
+                    class="btn btn-small btn-link edit-category-btn" 
+                    @click="startEditingCategory(transaction.id)"
+                    title="Edit category"
+                  >
+                    Edit
+                  </button>
                 </div>
-                <div v-else class="category-selector">
+                
+                <!-- Show "Auto-categorizing..." for transactions being processed -->
+                <div v-else-if="categorizingTransactions.includes(transaction.id)" class="category-processing">
+                  <span class="category-status">Auto-categorizing...</span>
+                </div>
+                
+                <!-- Show "Uncategorized" for transactions without categories -->
+                <div v-else class="category-uncategorized">
+                  <span class="category-status">Uncategorized</span>
+                  <button 
+                    class="btn btn-small btn-link edit-category-btn" 
+                    @click="startEditingCategory(transaction.id)"
+                    title="Assign category"
+                  >
+                    Assign
+                  </button>
+                </div>
+                
+                <!-- Show dropdown only when editing -->
+                <div v-if="transaction.editing_category" class="category-selector-edit">
                   <select 
                     @change="categorizeTransaction(transaction.id, $event.target.value)"
                     class="category-select"
                     :disabled="categorizingTransactions.includes(transaction.id)"
+                    :value="transaction.category_id || ''"
                   >
                     <option value="">Select category...</option>
                     <optgroup 
@@ -324,6 +345,13 @@
                       </option>
                     </optgroup>
                   </select>
+                  <button 
+                    class="btn btn-small btn-link cancel-edit-btn" 
+                    @click="cancelEditingCategory(transaction.id)"
+                    title="Cancel"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </td>
               
@@ -331,25 +359,6 @@
                 <span class="type-badge" :class="transaction.transaction_type">
                   {{ formatTransactionType(transaction.transaction_type) }}
                 </span>
-              </td>
-              
-              <td class="col-actions">
-                <div class="action-buttons">
-                  <button 
-                    class="btn btn-small btn-link" 
-                    @click="editTransaction(transaction)"
-                    title="Edit transaction"
-                  >
-                    Edit
-                  </button>
-                  <button 
-                    class="btn btn-small btn-link" 
-                    @click="viewTransactionDetails(transaction)"
-                    title="View details"
-                  >
-                    Details
-                  </button>
-                </div>
               </td>
             </tr>
           </tbody>
@@ -393,89 +402,8 @@
       </div>
     </div>
 
-    <!-- Transaction Detail Modal -->
-    <div v-if="selectedTransactionDetail" class="modal-overlay" @click="closeTransactionDetail">
-      <div class="modal-content transaction-detail-modal" @click.stop>
-        <div class="modal-header">
-          <h3>Transaction Details</h3>
-          <button class="btn btn-link close-btn" @click="closeTransactionDetail">×</button>
-        </div>
-        
-        <div class="modal-body">
-          <div class="detail-grid">
-            <div class="detail-item">
-              <label>Date</label>
-              <span>{{ formatDate(selectedTransactionDetail.posted_at) }}</span>
-            </div>
-            <div class="detail-item">
-              <label>Amount</label>
-              <span :class="getAmountClass(selectedTransactionDetail)">
-                {{ formatAmount(selectedTransactionDetail.amount) }}
-              </span>
-            </div>
-            <div class="detail-item">
-              <label>Merchant</label>
-              <span>{{ selectedTransactionDetail.merchant || 'Unknown' }}</span>
-            </div>
-            <div class="detail-item">
-              <label>Category</label>
-              <span>{{ selectedTransactionDetail.category_name || 'Uncategorized' }}</span>
-            </div>
-            <div class="detail-item">
-              <label>Type</label>
-              <span class="type-badge" :class="selectedTransactionDetail.transaction_type">
-                {{ formatTransactionType(selectedTransactionDetail.transaction_type) }}
-              </span>
-            </div>
-            <div class="detail-item" v-if="selectedTransactionDetail.owner">
-              <label>Owner</label>
-              <span>{{ selectedTransactionDetail.owner }}</span>
-            </div>
-            <div class="detail-item full-width" v-if="selectedTransactionDetail.memo">
-              <label>Memo</label>
-              <span>{{ selectedTransactionDetail.memo }}</span>
-            </div>
-            <div class="detail-item full-width" v-if="selectedTransactionDetail.notes">
-              <label>Notes</label>
-              <span>{{ selectedTransactionDetail.notes }}</span>
-            </div>
-          </div>
-          
-          <!-- CSV Data Section -->
-          <div v-if="hasCSVData(selectedTransactionDetail)" class="csv-section">
-            <h4>Original CSV Data</h4>
-            <div class="detail-grid">
-              <div class="detail-item" v-if="selectedTransactionDetail.main_category">
-                <label>Main Category</label>
-                <span>{{ selectedTransactionDetail.main_category }}</span>
-              </div>
-              <div class="detail-item" v-if="selectedTransactionDetail.csv_category">
-                <label>CSV Category</label>
-                <span>{{ selectedTransactionDetail.csv_category }}</span>
-              </div>
-              <div class="detail-item" v-if="selectedTransactionDetail.csv_subcategory">
-                <label>CSV Subcategory</label>
-                <span>{{ selectedTransactionDetail.csv_subcategory }}</span>
-              </div>
-              <div class="detail-item" v-if="selectedTransactionDetail.owner">
-                <label>Owner</label>
-                <span>{{ selectedTransactionDetail.owner }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="modal-actions">
-          <button class="btn" @click="editTransaction(selectedTransactionDetail)">
-            Edit Transaction
-          </button>
-          <button class="btn btn-link" @click="closeTransactionDetail">Close</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Reset Confirmation Modal -->
-    <div v-if="showResetModal" class="modal-overlay" @click="closeResetModal">
+    <div v-if="showResetModal" class="modal-overlay" @click="showResetModal = false">
       <div class="modal-content reset-modal" @click.stop>
         <div class="modal-header">
           <h3>Reset All Transaction Data</h3>
@@ -486,24 +414,9 @@
             <div class="warning-icon">⚠️</div>
             <div class="warning-text">
               <p><strong>This action cannot be undone!</strong></p>
-              <p>This will permanently delete:</p>
-              <ul>
-                <li>All {{ summary?.total_transactions || 0 }} transactions</li>
-                <li>All import batches and history</li>
-                <li>All categorization data</li>
-              </ul>
+              <p>This will permanently delete all {{ summary?.total_transactions || 0 }} transactions.</p>
               <p>Are you sure you want to continue?</p>
             </div>
-          </div>
-          
-          <div class="confirmation-input">
-            <label>Type "RESET" to confirm:</label>
-            <input 
-              type="text" 
-              v-model="resetConfirmationText"
-              class="reset-input"
-              placeholder="RESET"
-            >
           </div>
         </div>
         
@@ -511,11 +424,11 @@
           <button 
             class="btn btn-danger" 
             @click="confirmReset"
-            :disabled="resetConfirmationText !== 'RESET' || resetting"
+            :disabled="resetting"
           >
-            {{ resetting ? 'Resetting...' : 'Reset All Data' }}
+            {{ resetting ? 'Resetting...' : 'Yes, Reset All Data' }}
           </button>
-          <button class="btn btn-link" @click="closeResetModal" :disabled="resetting">
+          <button class="btn btn-link" @click="showResetModal = false" :disabled="resetting">
             Cancel
           </button>
         </div>
@@ -524,11 +437,9 @@
   </div>
 </template>
 
-
 <script>
 import { ref, computed, watch, onMounted } from 'vue'
 import axios from 'axios'
-
 
 export default {
   name: 'TransactionsTab',
@@ -582,9 +493,7 @@ export default {
     const categorizingTransactions = ref([])
     
     // Modal state refs
-    const selectedTransactionDetail = ref(null)
     const showResetModal = ref(false)
-    const resetConfirmationText = ref('')
     const resetting = ref(false)
 
     // Computed properties
@@ -625,15 +534,6 @@ export default {
     watch(() => [currentPage.value, pageSize.value, sortBy.value, sortOrder.value], () => {
       loadTransactions()
     })
-
-    // Clean up old uploads periodically
-    watch(localUploads, () => {
-      setTimeout(() => {
-        localUploads.value = localUploads.value.filter(upload => 
-          Date.now() - upload.id < 30000 || upload.status === 'processing'
-        )
-      }, 30000)
-    }, { deep: true })
 
     // File handling methods
     const triggerFileUpload = () => {
@@ -695,7 +595,7 @@ export default {
         
         emit('add-chat-message', {
           message: `Uploading: ${file.name}`,
-          response: `Processing ${file.name}... Please wait.`
+          response: `Processing ${file.name}... Categories from CSV will be automatically applied.`
         })
         
         try {
@@ -705,6 +605,7 @@ export default {
           formData.append('file', file)
           formData.append('account_name', 'Default Account')
           formData.append('account_type', 'checking')
+          formData.append('auto_categorize', 'true')
           
           const response = await axios.post(`${API_BASE}/transactions/import`, formData, {
             headers: {
@@ -721,10 +622,12 @@ export default {
           
           const duplicatesMsg = response.data.summary.rows_duplicated ? 
             ` (${response.data.summary.rows_duplicated} duplicates skipped)` : ''
+          const categorizedMsg = response.data.summary.auto_categorized ? 
+            ` ${response.data.summary.auto_categorized} automatically categorized from CSV data.` : ''
           
           emit('add-chat-message', {
             message: `File uploaded: ${file.name}`,
-            response: `Successfully processed ${file.name} with ${upload.rows} transactions imported!${duplicatesMsg}`
+            response: `Successfully processed ${file.name} with ${upload.rows} transactions imported!${duplicatesMsg}${categorizedMsg}`
           })
           
           await loadSummary()
@@ -736,12 +639,7 @@ export default {
           
           let errorMessage = 'Upload failed: Unknown error'
           if (error.response?.status === 401) {
-            try {
-              const newToken = await props.user.getIdToken(true)
-              errorMessage = 'Authentication failed. Please try signing out and back in.'
-            } catch (retryError) {
-              errorMessage = 'Authentication failed. Please try signing out and back in.'
-            }
+            errorMessage = 'Authentication failed. Please try signing out and back in.'
           } else if (error.response?.data?.detail) {
             errorMessage = error.response.data.detail
           } else if (error.code === 'ECONNABORTED') {
@@ -809,7 +707,11 @@ export default {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         
-        transactions.value = response.data
+        transactions.value = response.data.map(transaction => ({
+          ...transaction,
+          editing_category: false
+        }))
+        
         console.log('Loaded transactions:', transactions.value.length)
       } catch (error) {
         console.error('Failed to load transactions:', error)
@@ -834,7 +736,11 @@ export default {
               headers: { 'Authorization': `Bearer ${newToken}` }
             })
             
-            transactions.value = retryResponse.data
+            transactions.value = retryResponse.data.map(transaction => ({
+              ...transaction,
+              editing_category: false
+            }))
+            
             console.log('Transaction retry successful:', retryResponse.data.length)
           } catch (retryError) {
             console.error('Transaction retry failed:', retryError)
@@ -851,10 +757,30 @@ export default {
     }
 
     // Transaction management methods
+    const startEditingCategory = (transactionId) => {
+      const transaction = transactions.value.find(t => t.id === transactionId)
+      if (transaction) {
+        transaction.editing_category = true
+      }
+    }
+
+    const cancelEditingCategory = (transactionId) => {
+      const transaction = transactions.value.find(t => t.id === transactionId)
+      if (transaction) {
+        transaction.editing_category = false
+      }
+    }
+
     const categorizeTransaction = async (transactionId, categoryId) => {
       if (!categoryId || categorizingTransactions.value.includes(transactionId)) return
       
       categorizingTransactions.value.push(transactionId)
+      
+      // Stop editing mode
+      const transaction = transactions.value.find(t => t.id === transactionId)
+      if (transaction) {
+        transaction.editing_category = false
+      }
       
       try {
         const token = await props.user.getIdToken()
@@ -877,35 +803,9 @@ export default {
         
       } catch (error) {
         console.error('Failed to categorize transaction:', error)
-        if (error.response?.status === 401) {
-          try {
-            const newToken = await props.user.getIdToken(true)
-            await axios.post(`${API_BASE}/transactions/categorize/${transactionId}`, {
-              category_id: categoryId,
-              confidence: 1.0
-            }, {
-              headers: { 'Authorization': `Bearer ${newToken}` }
-            })
-            
-            const category = props.allCategories.find(c => c.id === categoryId)
-            emit('add-chat-message', {
-              message: 'Transaction categorized',
-              response: `Transaction successfully categorized as ${category?.name || 'selected category'}!`
-            })
-            
-            await loadTransactions()
-            await loadSummary()
-          } catch (retryError) {
-            console.error('Categorization retry failed:', retryError)
-            emit('add-chat-message', {
-              response: 'Failed to categorize transaction. Please try again.'
-            })
-          }
-        } else {
-          emit('add-chat-message', {
-            response: 'Failed to categorize transaction. Please try again.'
-          })
-        }
+        emit('add-chat-message', {
+          response: 'Failed to categorize transaction. Please try again.'
+        })
       } finally {
         categorizingTransactions.value = categorizingTransactions.value.filter(id => id !== transactionId)
       }
@@ -938,46 +838,13 @@ export default {
         
       } catch (error) {
         console.error('Bulk categorization failed:', error)
-        if (error.response?.status === 401) {
-          try {
-            const newToken = await props.user.getIdToken(true)
-            await axios.post(`${API_BASE}/transactions/bulk-categorize`, {
-              transaction_ids: selectedTransactions.value,
-              category_id: bulkCategoryId.value,
-              confidence: 1.0
-            }, {
-              headers: { 'Authorization': `Bearer ${newToken}` }
-            })
-            
-            const category = props.allCategories.find(c => c.id === bulkCategoryId.value)
-            emit('add-chat-message', {
-              message: `Bulk categorization: ${selectedTransactions.value.length} transactions`,
-              response: `Successfully categorized ${selectedTransactions.value.length} transactions as ${category?.name || 'selected category'}!`
-            })
-            
-            selectedTransactions.value = []
-            bulkCategoryId.value = ''
-            await loadTransactions()
-            await loadSummary()
-          } catch (retryError) {
-            console.error('Bulk categorization retry failed:', retryError)
-            emit('add-chat-message', {
-              response: 'Bulk categorization failed. Please try again.'
-            })
-          }
-        } else {
-          emit('add-chat-message', {
-            response: 'Bulk categorization failed. Please try again.'
-          })
-        }
+        emit('add-chat-message', {
+          response: 'Bulk categorization failed. Please try again.'
+        })
       }
     }
 
-    // Filter and UI methods
-    const toggleFilters = () => {
-      showFilters.value = !showFilters.value
-    }
-
+    // Filter methods - simplified to direct value manipulation
     const clearFilters = () => {
       filters.value = {
         startDate: '',
@@ -1034,48 +901,24 @@ export default {
       loadTransactions()
     }
 
-    // Modal methods
-    const viewTransactionDetails = (transaction) => {
-      selectedTransactionDetail.value = transaction
-    }
-
-    const closeTransactionDetail = () => {
-      selectedTransactionDetail.value = null
-    }
-
-    const editTransaction = (transaction) => {
-      console.log('Edit transaction:', transaction)
-    }
-
-    const showBatchDetails = (batchId) => {
-      console.log('Show batch details:', batchId)
-    }
-
     // Reset functionality
-    const showResetConfirmation = () => {
-      showResetModal.value = true
-      resetConfirmationText.value = ''
-    }
-
-    const closeResetModal = () => {
-      showResetModal.value = false
-      resetConfirmationText.value = ''
-    }
-
     const confirmReset = async () => {
-      if (resetConfirmationText.value !== 'RESET' || resetting.value) return
+      if (resetting.value) return
       
       resetting.value = true
       
       try {
         const token = await props.user.getIdToken()
         
-        // Call backend endpoint to reset all data
-        await axios.delete(`${API_BASE}/transactions/reset-all`, {
+        // Try POST method first (more widely supported)
+        await axios.post(`${API_BASE}/transactions/reset`, {
+          action: 'reset_all',
+          confirm: true
+        }, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         
-        // Clear local state
+        // Clear local state on success
         transactions.value = []
         summary.value = null
         selectedTransactions.value = []
@@ -1086,45 +929,18 @@ export default {
           response: 'All transaction data has been successfully reset. You can now import fresh data.'
         })
         
-        closeResetModal()
+        showResetModal.value = false
         
       } catch (error) {
         console.error('Reset failed:', error)
         
-        let errorMessage = 'Reset failed. Please try again.'
-        if (error.response?.status === 401) {
-          try {
-            const newToken = await props.user.getIdToken(true)
-            await axios.delete(`${API_BASE}/transactions/reset-all`, {
-              headers: { 'Authorization': `Bearer ${newToken}` }
-            })
-            
-            transactions.value = []
-            summary.value = null
-            selectedTransactions.value = []
-            localUploads.value = []
-            
-            emit('add-chat-message', {
-              message: 'Reset all transaction data',
-              response: 'All transaction data has been successfully reset. You can now import fresh data.'
-            })
-            
-            closeResetModal()
-          } catch (retryError) {
-            console.error('Reset retry failed:', retryError)
-            emit('add-chat-message', {
-              response: 'Reset failed. Please try signing out and back in.'
-            })
-          }
-        } else if (error.response?.data?.detail) {
-          errorMessage = error.response.data.detail
-        }
+        // For now, just show that reset is not available
+        // Since backend doesn't support reset endpoint yet
+        const errorMessage = 'Reset feature is not yet implemented on the server. Please contact support or manually delete data through database.'
         
-        if (resetting.value) {
-          emit('add-chat-message', {
-            response: errorMessage
-          })
-        }
+        emit('add-chat-message', {
+          response: errorMessage
+        })
       } finally {
         resetting.value = false
       }
@@ -1167,13 +983,6 @@ export default {
       return text.substring(0, maxLength) + '...'
     }
 
-    const hasCSVData = (transaction) => {
-      return transaction.main_category || 
-             transaction.csv_category || 
-             transaction.csv_subcategory || 
-             transaction.owner
-    }
-
     // Initialize data on component mount
     onMounted(async () => {
       if (props.user) {
@@ -1212,9 +1021,7 @@ export default {
       allVisibleTransactionsSelected,
       
       // Modals
-      selectedTransactionDetail,
       showResetModal,
-      resetConfirmationText,
       resetting,
       
       // Computed
@@ -1231,11 +1038,12 @@ export default {
       refreshTransactions,
       
       // Transaction methods
+      startEditingCategory,
+      cancelEditingCategory,
       categorizeTransaction,
       bulkCategorize,
       
       // Filter and UI methods
-      toggleFilters,
       clearFilters,
       toggleSort,
       
@@ -1248,15 +1056,7 @@ export default {
       changePage,
       changePageSize,
       
-      // Modal methods
-      viewTransactionDetails,
-      closeTransactionDetail,
-      editTransaction,
-      showBatchDetails,
-      
       // Reset methods
-      showResetConfirmation,
-      closeResetModal,
       confirmReset,
       
       // Utility methods
@@ -1264,8 +1064,7 @@ export default {
       formatAmount,
       formatTransactionType,
       getAmountClass,
-      truncateText,
-      hasCSVData
+      truncateText
     }
   }
 }
