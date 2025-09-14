@@ -3,531 +3,624 @@ import hashlib
 import uuid
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Dict, Tuple, Optional, Union, Any
 import re
 from io import StringIO, BytesIO
 import logging
+import numpy as np
+from pathlib import Path
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class CSVProcessor:
-    """Enhanced CSV processor with better error handling and flexible column mapping"""
+class EnhancedCSVProcessor:
+    """
+    Enhanced CSV processor specifically designed for financial transaction data
+    Handles large files (7500+ rows) efficiently with robust error handling
+    """
     
-    # Expected columns with multiple possible names (case-insensitive)
-    COLUMN_MAPPINGS = {
-        "date": ["Date", "date", "DATE", "Transaction Date", "Posted Date", "transaction_date", "posted_date"],
-        "amount": ["Amount", "amount", "AMOUNT", "Transaction Amount", "transaction_amount"], 
-        "merchant": ["Merchant", "merchant", "MERCHANT", "Description", "description", "DESCRIPTION", "Payee", "payee"],
-        "message": ["Message", "message", "MESSAGE", "Memo", "memo", "MEMO", "Note", "note"],
-        "full_description": ["Full_Description", "full_description", "FULL_DESCRIPTION", "Details", "details"],
-        "main_category": ["Main_Category", "main_category", "MAIN_CATEGORY", "Category", "Primary Category"],
-        "category": ["Category", "category", "CATEGORY", "Sub Category", "SubCategory", "sub_category"],
-        "subcategory": ["Subcategory", "subcategory", "SUBCATEGORY", "Sub_Category", "subCategory"],
-        "account": ["Account", "account", "ACCOUNT", "Account Name", "account_name"],
-        "owner": ["Owner", "owner", "OWNER", "Account Owner", "account_owner"],
-        "account_type": ["Account_Type", "account_type", "ACCOUNT_TYPE", "Account Type", "Type"],
-        "amount_abs": ["Amount_Abs", "amount_abs", "AMOUNT_ABS", "Absolute Amount", "abs_amount"],
-        "is_expense": ["Is_Expense", "is_expense", "IS_EXPENSE", "Expense", "expense"],
-        "is_income": ["Is_Income", "is_income", "IS_INCOME", "Income", "income"],
-        "year": ["Year", "year", "YEAR"],
-        "month": ["Month", "month", "MONTH"],
-        "year_month": ["Year_Month", "year_month", "YEAR_MONTH", "YearMonth", "year-month"],
-        "weekday": ["Weekday", "weekday", "WEEKDAY", "Day of Week", "day_of_week", "DayOfWeek"],
-        "transfer_pair_id": ["Transfer_Pair_ID", "transfer_pair_id", "TRANSFER_PAIR_ID", "Transfer ID", "transfer_id"]
+    # Expected column mappings for your 19-column format
+    EXPECTED_COLUMNS = {
+        'Date': 'date',
+        'Amount': 'amount', 
+        'Merchant': 'merchant',
+        'Message': 'message',
+        'Full_Description': 'full_description',
+        'Main_Category': 'main_category',
+        'Category': 'category',
+        'Subcategory': 'subcategory',
+        'Account': 'account',
+        'Owner': 'owner',
+        'Account_Type': 'account_type',
+        'Amount_Abs': 'amount_abs',
+        'Is_Expense': 'is_expense',
+        'Is_Income': 'is_income',
+        'Year': 'year',
+        'Month': 'month',
+        'Year_Month': 'year_month',
+        'Weekday': 'weekday',
+        'Transfer_Pair_ID': 'transfer_pair_id'
     }
     
-    # Date formats to try
+    # Date formats to try (most common first for performance)
     DATE_FORMATS = [
-        "%Y-%m-%d", "%Y-%m-%d %H:%M:%S",
-        "%m/%d/%Y", "%m/%d/%y", "%m/%d/%Y %H:%M:%S",
-        "%d/%m/%Y", "%d/%m/%y", "%d/%m/%Y %H:%M:%S",
-        "%Y/%m/%d", "%Y/%m/%d %H:%M:%S",
-        "%m-%d-%Y", "%m-%d-%y",
-        "%d-%m-%Y", "%d-%m-%y",
-        "%b %d, %Y", "%B %d, %Y",
-        "%d %b %Y", "%d %B %Y"
+        '%Y-%m-%d',           # 2023-12-25
+        '%m/%d/%Y',           # 12/25/2023
+        '%d/%m/%Y',           # 25/12/2023
+        '%Y/%m/%d',           # 2023/12/25
+        '%m-%d-%Y',           # 12-25-2023
+        '%d-%m-%Y',           # 25-12-2023
+        '%Y-%m-%d %H:%M:%S',  # 2023-12-25 14:30:00
+        '%m/%d/%Y %H:%M:%S',  # 12/25/2023 14:30:00
+        '%d/%m/%Y %H:%M:%S',  # 25/12/2023 14:30:00
+        '%Y/%m/%d %H:%M:%S',  # 2023/12/25 14:30:00
+        '%b %d, %Y',          # Dec 25, 2023
+        '%B %d, %Y',          # December 25, 2023
+        '%d %b %Y',           # 25 Dec 2023
+        '%d %B %Y'            # 25 December 2023
     ]
     
     def __init__(self):
         self.errors = []
         self.warnings = []
-        self.column_map = {}
-        
-    def detect_columns(self, df: pd.DataFrame) -> Dict[str, str]:
-        """Detect which columns in the DataFrame match our expected columns"""
-        column_map = {}
-        available_columns = [col.strip() for col in df.columns]
-        
-        logger.info(f"Available columns: {available_columns}")
-        
-        for expected_key, possible_names in self.COLUMN_MAPPINGS.items():
-            found_column = None
-            
-            # Try exact matches first (case-insensitive)
-            for possible_name in possible_names:
-                for actual_column in available_columns:
-                    if actual_column.lower() == possible_name.lower():
-                        found_column = actual_column
-                        break
-                if found_column:
-                    break
-            
-            # If no exact match, try partial matches
-            if not found_column:
-                for possible_name in possible_names:
-                    for actual_column in available_columns:
-                        if possible_name.lower() in actual_column.lower() or actual_column.lower() in possible_name.lower():
-                            found_column = actual_column
-                            break
-                    if found_column:
-                        break
-            
-            if found_column:
-                column_map[expected_key] = found_column
-                logger.info(f"Mapped {expected_key} -> {found_column}")
-        
-        # Check for required columns
-        required_columns = ['date', 'amount']
-        missing_required = [col for col in required_columns if col not in column_map]
-        
-        if missing_required:
-            # Try common alternative patterns
-            if 'date' not in column_map:
-                date_candidates = [col for col in available_columns if 
-                                 any(word in col.lower() for word in ['date', 'time', 'posted', 'transaction'])]
-                if date_candidates:
-                    column_map['date'] = date_candidates[0]
-                    logger.info(f"Found date candidate: {date_candidates[0]}")
-                    missing_required.remove('date')
-            
-            if 'amount' not in column_map:
-                amount_candidates = [col for col in available_columns if 
-                                   any(word in col.lower() for word in ['amount', 'value', 'total', 'sum'])]
-                if amount_candidates:
-                    column_map['amount'] = amount_candidates[0]
-                    logger.info(f"Found amount candidate: {amount_candidates[0]}")
-                    missing_required.remove('amount')
-        
-        if missing_required:
-            raise ValueError(f"Missing required columns: {missing_required}. Available: {available_columns}")
-        
-        self.column_map = column_map
-        return column_map
+        self.stats = {
+            'total_rows': 0,
+            'processed_rows': 0,
+            'error_rows': 0,
+            'duplicate_rows': 0,
+            'success_rate': 0.0
+        }
     
-    def parse_csv_file(self, file_content: Union[str, bytes], filename: str) -> pd.DataFrame:
-        """Parse CSV file content into a pandas DataFrame with flexible parsing"""
+    def detect_file_encoding(self, file_content: bytes) -> str:
+        """
+        Detect file encoding with fallback options
+        """
+        encodings_to_try = ['utf-8-sig', 'utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        
+        for encoding in encodings_to_try:
+            try:
+                content = file_content.decode(encoding)
+                logger.info(f"Successfully detected encoding: {encoding}")
+                return content
+            except UnicodeDecodeError:
+                continue
+        
+        # Final fallback with error handling
+        logger.warning("Could not detect encoding, using UTF-8 with error replacement")
+        return file_content.decode('utf-8', errors='replace')
+    
+    def parse_csv_content(self, file_content: Union[str, bytes], filename: str) -> pd.DataFrame:
+        """
+        Parse CSV content with robust error handling and format detection
+        """
         try:
-            # Handle bytes or string content
+            # Handle bytes content
             if isinstance(file_content, bytes):
-                file_content = file_content.decode('utf-8-sig')  # Handle BOM
+                content = self.detect_file_encoding(file_content)
+            else:
+                content = file_content.strip()
             
-            # Clean the content
-            file_content = file_content.strip()
+            if not content:
+                raise ValueError("File appears to be empty")
             
-            if not file_content:
-                raise ValueError("File is empty")
+            logger.info(f"Processing file: {filename}")
+            logger.info(f"Content preview: {content[:200]}...")
             
-            # Try different separators and encodings
-            separators = [',', ';', '\t', '|']
+            # Try different parsing strategies
+            parsing_strategies = [
+                # Strategy 1: Standard comma-separated
+                {'sep': ',', 'quotechar': '"', 'skipinitialspace': True},
+                # Strategy 2: Semicolon separated (European format)
+                {'sep': ';', 'quotechar': '"', 'skipinitialspace': True},
+                # Strategy 3: Tab separated
+                {'sep': '\t', 'quotechar': '"', 'skipinitialspace': True},
+                # Strategy 4: Pipe separated
+                {'sep': '|', 'quotechar': '"', 'skipinitialspace': True},
+                # Strategy 5: Auto-detect with pandas
+                {'sep': None, 'quotechar': '"', 'skipinitialspace': True},
+            ]
+            
             df = None
+            successful_strategy = None
             
-            for sep in separators:
+            for i, strategy in enumerate(parsing_strategies, 1):
                 try:
-                    # Try with different quote characters and escaping
-                    for quotechar in ['"', "'"]:
-                        try:
-                            df = pd.read_csv(
-                                StringIO(file_content), 
-                                separator=sep,
-                                quotechar=quotechar,
-                                escapechar='\\',
-                                skipinitialspace=True,
-                                dtype=str,  # Read everything as string initially
-                                na_values=['', 'NULL', 'null', 'N/A', 'n/a', 'NA', '#N/A'],
-                                keep_default_na=False
-                            )
-                            if len(df.columns) > 1 and len(df) > 0:
-                                logger.info(f"Successfully parsed with separator '{sep}' and quotechar '{quotechar}'")
-                                break
-                        except Exception as e:
-                            continue
-                    if df is not None and len(df.columns) > 1:
+                    logger.info(f"Trying parsing strategy {i}: {strategy}")
+                    
+                    df = pd.read_csv(
+                        StringIO(content),
+                        dtype=str,  # Read everything as string initially
+                        na_values=['', 'NULL', 'null', 'N/A', 'n/a', 'NA', '#N/A', 'None'],
+                        keep_default_na=False,
+                        encoding=None,  # Already handled encoding
+                        on_bad_lines='skip',  # Skip problematic lines
+                        **strategy
+                    )
+                    
+                    # Validate the parsed result
+                    if len(df.columns) >= 10 and len(df) > 0:  # Should have at least 10 columns for financial data
+                        successful_strategy = strategy
+                        logger.info(f"✅ Successfully parsed with strategy {i}")
+                        logger.info(f"DataFrame shape: {df.shape}")
+                        logger.info(f"Columns: {list(df.columns)}")
                         break
+                        
                 except Exception as e:
-                    logger.debug(f"Failed with separator '{sep}': {e}")
+                    logger.debug(f"Strategy {i} failed: {str(e)}")
                     continue
             
-            if df is None or len(df.columns) <= 1 or len(df) == 0:
-                raise ValueError(f"Could not parse CSV file. Tried separators: {separators}")
+            if df is None or len(df) == 0:
+                raise ValueError(f"Could not parse CSV file with any strategy. Content preview: {content[:500]}")
             
-            # Clean column names - remove extra whitespace and special characters
+            # Clean column names
             df.columns = [col.strip().replace('\n', '').replace('\r', '') for col in df.columns]
             
             # Remove completely empty rows
             df = df.dropna(how='all')
             
-            # Remove rows where all important fields are empty
             if len(df) == 0:
-                raise ValueError("No data rows found after cleaning")
+                raise ValueError("No valid data rows found after cleaning")
             
-            logger.info(f"Parsed CSV: {len(df)} rows, {len(df.columns)} columns")
+            logger.info(f"✅ Final DataFrame: {len(df)} rows × {len(df.columns)} columns")
             logger.info(f"Columns: {list(df.columns)}")
             
             return df
             
         except Exception as e:
-            self.errors.append(f"Failed to parse CSV: {str(e)}")
-            logger.error(f"CSV parsing failed: {str(e)}")
-            raise ValueError(f"CSV parsing failed: {str(e)}")
+            error_msg = f"CSV parsing failed for {filename}: {str(e)}"
+            logger.error(error_msg)
+            self.errors.append(error_msg)
+            raise ValueError(error_msg)
     
-    def normalize_date(self, date_str: str) -> Optional[datetime]:
-        """Normalize date string to datetime object"""
-        if pd.isna(date_str) or not date_str:
+    def map_columns(self, df: pd.DataFrame) -> Dict[str, str]:
+        """
+        Map DataFrame columns to our expected column names with fuzzy matching
+        """
+        column_mapping = {}
+        available_columns = list(df.columns)
+        
+        logger.info(f"Mapping columns from: {available_columns}")
+        
+        # Exact matches first (case-insensitive)
+        for expected_col, internal_name in self.EXPECTED_COLUMNS.items():
+            for actual_col in available_columns:
+                if actual_col.lower() == expected_col.lower():
+                    column_mapping[internal_name] = actual_col
+                    logger.info(f"✅ Exact match: {internal_name} ← {actual_col}")
+                    break
+        
+        # Fuzzy matches for unmapped columns
+        remaining_expected = set(self.EXPECTED_COLUMNS.values()) - set(column_mapping.keys())
+        remaining_actual = set(available_columns) - set(column_mapping.values())
+        
+        for internal_name in remaining_expected:
+            expected_col = next(k for k, v in self.EXPECTED_COLUMNS.items() if v == internal_name)
+            
+            # Try partial matching
+            for actual_col in remaining_actual:
+                actual_lower = actual_col.lower()
+                expected_lower = expected_col.lower()
+                
+                # Check if either contains the other
+                if (expected_lower in actual_lower or 
+                    actual_lower in expected_lower or
+                    self._fuzzy_match(expected_lower, actual_lower)):
+                    
+                    column_mapping[internal_name] = actual_col
+                    logger.info(f"🔍 Fuzzy match: {internal_name} ← {actual_col}")
+                    remaining_actual.discard(actual_col)
+                    break
+        
+        # Log unmapped columns
+        unmapped = remaining_expected
+        if unmapped:
+            logger.warning(f"⚠️ Unmapped expected columns: {unmapped}")
+        
+        unused = remaining_actual
+        if unused:
+            logger.info(f"ℹ️ Unused CSV columns: {unused}")
+        
+        return column_mapping
+    
+    def _fuzzy_match(self, str1: str, str2: str, threshold: float = 0.6) -> bool:
+        """Simple fuzzy matching for column names"""
+        # Remove common separators and check similarity
+        clean1 = re.sub(r'[_\-\s]', '', str1)
+        clean2 = re.sub(r'[_\-\s]', '', str2)
+        
+        if len(clean1) == 0 or len(clean2) == 0:
+            return False
+        
+        # Simple character overlap ratio
+        overlap = len(set(clean1) & set(clean2))
+        max_len = max(len(clean1), len(clean2))
+        similarity = overlap / max_len
+        
+        return similarity >= threshold
+    
+    def normalize_date(self, date_value: Any) -> Optional[datetime]:
+        """Enhanced date normalization with multiple format support"""
+        if pd.isna(date_value) or date_value == '' or date_value is None:
             return None
         
-        date_str = str(date_str).strip()
+        date_str = str(date_value).strip()
         
         # Handle Excel date serial numbers
-        try:
-            if date_str.isdigit() and len(date_str) == 5:  # Excel date serial
-                excel_date = int(date_str)
-                if 25000 < excel_date < 50000:  # Reasonable range for dates
-                    return datetime(1900, 1, 1) + pd.Timedelta(days=excel_date-2)
-        except:
-            pass
+        if date_str.replace('.', '').isdigit():
+            try:
+                excel_date = float(date_str)
+                if 25000 <= excel_date <= 50000:  # Reasonable range for Excel dates
+                    base_date = datetime(1900, 1, 1)
+                    return base_date + pd.Timedelta(days=excel_date-2)
+            except (ValueError, OverflowError):
+                pass
         
+        # Try each date format
         for fmt in self.DATE_FORMATS:
             try:
                 parsed_date = datetime.strptime(date_str, fmt)
-                # Validate date is reasonable (between 1900 and 2030)
-                if 1900 <= parsed_date.year <= 2030:
+                # Validate reasonable date range
+                if 1990 <= parsed_date.year <= 2030:
                     return parsed_date
             except ValueError:
                 continue
         
-        # Try pandas date parser as fallback
+        # Fallback to pandas parser
         try:
             parsed_date = pd.to_datetime(date_str, infer_datetime_format=True)
             if pd.notna(parsed_date):
-                return parsed_date.to_pydatetime()
+                dt = parsed_date.to_pydatetime()
+                if 1990 <= dt.year <= 2030:
+                    return dt
         except:
             pass
         
         self.warnings.append(f"Could not parse date: {date_str}")
         return None
     
-    def normalize_amount(self, amount_str: Union[str, int, float]) -> Optional[Decimal]:
-        """Normalize amount to Decimal with enhanced parsing"""
-        if pd.isna(amount_str) or amount_str == '' or amount_str is None:
+    def normalize_amount(self, amount_value: Any) -> Optional[Decimal]:
+        """Enhanced amount normalization"""
+        if pd.isna(amount_value) or amount_value == '' or amount_value is None:
             return None
         
-        # Convert to string and clean
-        amount_str = str(amount_str).strip()
+        # Handle numeric types directly
+        if isinstance(amount_value, (int, float)):
+            if np.isfinite(amount_value):
+                return Decimal(str(amount_value))
+            else:
+                return None
         
+        amount_str = str(amount_value).strip()
         if not amount_str:
             return None
         
-        # Remove currency symbols, spaces, and common formatting
-        amount_str = re.sub(r'[$€£¥₹,\s]', '', amount_str)
+        # Remove currency symbols and thousands separators
+        amount_str = re.sub(r'[$€£¥₹\s]', '', amount_str)
         
-        # Handle parentheses as negative (accounting format)
+        # Handle parentheses for negative amounts (accounting format)
         is_negative = False
         if amount_str.startswith('(') and amount_str.endswith(')'):
             amount_str = amount_str[1:-1]
             is_negative = True
         
-        # Handle negative signs
-        if amount_str.startswith('-'):
-            is_negative = True
-            amount_str = amount_str[1:]
-        elif amount_str.startswith('+'):
+        # Handle explicit signs
+        if amount_str.startswith(('-', '+')):
+            if amount_str.startswith('-'):
+                is_negative = True
             amount_str = amount_str[1:]
         
-        # Handle different decimal separators
-        # If there are multiple periods or commas, assume the last one is decimal
+        # Handle decimal separators
         if '.' in amount_str and ',' in amount_str:
-            last_period = amount_str.rfind('.')
+            # Determine which is the decimal separator
+            last_dot = amount_str.rfind('.')
             last_comma = amount_str.rfind(',')
-            if last_period > last_comma:
-                # Period is decimal separator
+            
+            if last_dot > last_comma:
+                # Dot is decimal separator
                 amount_str = amount_str.replace(',', '')
             else:
                 # Comma is decimal separator
                 amount_str = amount_str.replace('.', '').replace(',', '.')
         elif ',' in amount_str:
-            # Check if comma is likely decimal separator (has 2 digits after)
-            comma_parts = amount_str.split(',')
-            if len(comma_parts) == 2 and len(comma_parts[1]) <= 2:
+            # Check if comma is likely a decimal separator
+            parts = amount_str.split(',')
+            if len(parts) == 2 and len(parts[1]) <= 3:
                 amount_str = amount_str.replace(',', '.')
             else:
                 amount_str = amount_str.replace(',', '')
         
         try:
             result = Decimal(amount_str)
-            if is_negative:
-                result = -result
-            return result
+            return -result if is_negative else result
         except (InvalidOperation, ValueError):
-            self.warnings.append(f"Could not parse amount: {amount_str}")
+            self.warnings.append(f"Could not parse amount: {amount_value}")
             return None
     
-    def normalize_merchant(self, merchant_str: str) -> str:
-        """Clean and normalize merchant name"""
-        if pd.isna(merchant_str) or not merchant_str:
-            return ""
-        
-        merchant = str(merchant_str).strip()
-        
-        # Remove extra whitespace
-        merchant = re.sub(r'\s+', ' ', merchant)
-        
-        # Common cleanup patterns
-        merchant = re.sub(r'\*+', '', merchant)  # Remove asterisks
-        merchant = re.sub(r'^\d{4,}\s*', '', merchant)  # Remove leading numbers (often IDs)
-        merchant = re.sub(r'#\d+$', '', merchant)  # Remove trailing reference numbers
-        
-        return merchant[:255]  # Limit length
-    
-    def normalize_boolean(self, value: Union[str, bool, int, float]) -> bool:
-        """Normalize boolean values from CSV"""
-        if pd.isna(value):
+    def normalize_boolean(self, bool_value: Any) -> bool:
+        """Enhanced boolean normalization"""
+        if pd.isna(bool_value) or bool_value == '':
             return False
         
-        if isinstance(value, bool):
-            return value
+        if isinstance(bool_value, bool):
+            return bool_value
         
-        if isinstance(value, (int, float)):
-            return bool(value)
+        if isinstance(bool_value, (int, float)):
+            return bool(bool_value)
         
-        if isinstance(value, str):
-            value = value.strip().lower()
-            return value in ['true', '1', 'yes', 'y', 't', 'on']
+        if isinstance(bool_value, str):
+            value = bool_value.strip().lower()
+            return value in {'true', '1', 'yes', 'y', 't', 'on', 'checked'}
         
         return False
     
-    def map_transaction_type(self, is_income: bool, is_expense: bool, amount: Decimal, merchant: str = "") -> str:
-        """Determine transaction type based on flags and amount"""
-        if is_income:
-            return "income"
-        elif is_expense:
-            return "expense"
-        else:
-            # Enhanced logic based on amount and merchant
-            if amount is None:
-                return "unknown"
-            
-            # Check for transfer keywords in merchant
-            transfer_keywords = ['transfer', 'xfer', 'payment to', 'payment from', 'internal', 'between accounts']
-            if any(keyword in merchant.lower() for keyword in transfer_keywords):
-                return "transfer"
-            
-            # Amount-based detection
-            if amount > 0:
-                return "income"
-            elif amount < 0:
-                return "expense"
-            else:
-                return "transfer"
-    
-    def generate_hash(self, user_id: str, date: datetime, amount: Decimal, merchant: str, memo: str = "") -> str:
-        """Generate hash for deduplication"""
-        # Create a more robust hash that handles slight variations
-        amount_str = str(abs(float(amount))) if amount else "0"
-        date_str = date.strftime('%Y-%m-%d') if date else ""
-        merchant_clean = re.sub(r'[^\w\s]', '', merchant.lower()) if merchant else ""
-        memo_clean = re.sub(r'[^\w\s]', '', memo.lower())[:50] if memo else ""  # Truncate memo
+    def generate_dedup_hash(self, user_id: str, row_data: Dict) -> str:
+        """Generate consistent hash for deduplication"""
+        # Use key fields for deduplication
+        date_str = row_data.get('date', '').strftime('%Y-%m-%d') if row_data.get('date') else ''
+        amount_str = str(row_data.get('amount', '0'))
+        merchant = re.sub(r'[^\w\s]', '', (row_data.get('merchant', '') or '')).lower()
+        message = re.sub(r'[^\w\s]', '', (row_data.get('message', '') or ''))[:100].lower()
         
-        content = f"{user_id}_{date_str}_{amount_str}_{merchant_clean}_{memo_clean}"
+        content = f"{user_id}_{date_str}_{amount_str}_{merchant}_{message}"
         return hashlib.sha256(content.encode()).hexdigest()
     
-    def get_column_value(self, row: pd.Series, column_key: str, default="") -> str:
-        """Safely get column value with fallback"""
-        if column_key in self.column_map:
-            column_name = self.column_map[column_key]
-            value = row.get(column_name, default)
-            return str(value).strip() if pd.notna(value) else str(default)
-        return str(default)
-    
-    def process_transactions(self, df: pd.DataFrame, user_id: str, account_id: str = None) -> List[Dict]:
-        """Process DataFrame into transaction dictionaries"""
+    def process_dataframe(self, df: pd.DataFrame, user_id: str, account_id: str = None) -> List[Dict]:
+        """Process the DataFrame into transaction dictionaries"""
         transactions = []
         batch_id = str(uuid.uuid4())
         
-        # Detect column mappings
-        try:
-            self.detect_columns(df)
-        except ValueError as e:
-            self.errors.append(str(e))
-            return []
+        # Map columns
+        column_map = self.map_columns(df)
+        logger.info(f"Column mapping: {column_map}")
         
-        logger.info(f"Processing {len(df)} rows with column mappings: {self.column_map}")
+        # Check for required columns
+        required = ['date', 'amount']
+        missing_required = [col for col in required if col not in column_map]
+        
+        if missing_required:
+            raise ValueError(f"Missing required columns: {missing_required}")
+        
+        self.stats['total_rows'] = len(df)
+        logger.info(f"Processing {len(df)} rows...")
         
         for index, row in df.iterrows():
             try:
-                # Extract and normalize core data
-                date_val = self.get_column_value(row, 'date')
-                amount_val = self.get_column_value(row, 'amount', 0)
-                merchant_val = self.get_column_value(row, 'merchant')
+                # Extract core data
+                date_val = row.get(column_map.get('date', ''), None)
+                amount_val = row.get(column_map.get('amount', ''), None)
                 
-                # Parse values
+                # Parse required fields
                 date = self.normalize_date(date_val)
                 amount = self.normalize_amount(amount_val)
-                merchant = self.normalize_merchant(merchant_val)
                 
                 if not date:
-                    self.warnings.append(f"Row {index + 1}: Invalid or missing date: {date_val}")
+                    self.warnings.append(f"Row {index + 1}: Invalid date: {date_val}")
+                    self.stats['error_rows'] += 1
                     continue
                 
                 if amount is None:
-                    self.warnings.append(f"Row {index + 1}: Invalid or missing amount: {amount_val}")
+                    self.warnings.append(f"Row {index + 1}: Invalid amount: {amount_val}")
+                    self.stats['error_rows'] += 1
                     continue
                 
-                # Extract additional fields with safe access
-                message_val = self.get_column_value(row, 'message')
-                full_desc_val = self.get_column_value(row, 'full_description')
-                main_category = self.get_column_value(row, 'main_category')
-                category = self.get_column_value(row, 'category')
-                subcategory = self.get_column_value(row, 'subcategory')
-                account = self.get_column_value(row, 'account')
-                owner = self.get_column_value(row, 'owner')
-                account_type = self.get_column_value(row, 'account_type')
+                # Extract all other fields with safe access
+                def safe_get(col_key: str, default='') -> str:
+                    if col_key in column_map:
+                        val = row.get(column_map[col_key], default)
+                        return str(val).strip() if pd.notna(val) and val != '' else str(default)
+                    return str(default)
                 
-                # Boolean fields
-                is_expense = self.normalize_boolean(self.get_column_value(row, 'is_expense', False))
-                is_income = self.normalize_boolean(self.get_column_value(row, 'is_income', False))
+                def safe_get_bool(col_key: str) -> bool:
+                    if col_key in column_map:
+                        val = row.get(column_map[col_key], False)
+                        return self.normalize_boolean(val)
+                    return False
                 
-                # Determine transaction type
-                transaction_type = self.map_transaction_type(is_income, is_expense, amount, merchant)
+                def safe_get_int(col_key: str, default: int = None) -> Optional[int]:
+                    if col_key in column_map:
+                        val = row.get(column_map[col_key], default)
+                        if pd.notna(val) and val != '':
+                            try:
+                                return int(float(val))  # Handle "2023.0" -> 2023
+                            except (ValueError, TypeError):
+                                pass
+                    return default
                 
-                # Create memo from available text fields
-                memo_parts = []
-                if message_val:
-                    memo_parts.append(message_val)
-                if full_desc_val and full_desc_val != message_val:
-                    memo_parts.append(full_desc_val)
-                memo = " | ".join(memo_parts)[:500]  # Limit length
-                
-                # Generate deduplication hash
-                hash_dedupe = self.generate_hash(user_id, date, amount, merchant, memo)
-                
-                # Extract year/month info
-                year_val = self.get_column_value(row, 'year')
-                month_val = self.get_column_value(row, 'month')
-                year_month_val = self.get_column_value(row, 'year_month')
-                weekday_val = self.get_column_value(row, 'weekday')
-                
-                # Validate or calculate year/month
-                year = int(year_val) if year_val.isdigit() else date.year
-                month = int(month_val) if month_val.isdigit() and 1 <= int(month_val) <= 12 else date.month
-                year_month = year_month_val if year_month_val else f"{year}-{month:02d}"
-                weekday = weekday_val if weekday_val else date.strftime('%A')
-                
-                # Build transaction object
+                # Build transaction object with all available fields
                 transaction = {
                     'user_id': user_id,
                     'account_id': account_id,
                     'posted_at': date,
                     'amount': amount,
-                    'currency': 'USD',  # Default, could be detected from data
-                    'merchant': merchant,
-                    'memo': memo,
+                    'currency': 'USD',  # Default
+                    'merchant': safe_get('merchant'),
+                    'memo': safe_get('message'),
                     'import_batch_id': batch_id,
-                    'hash_dedupe': hash_dedupe,
                     'source_category': 'imported',
                     
-                    # Extended fields from CSV
-                    'transaction_type': transaction_type,
-                    'main_category': main_category,
-                    'csv_category': category,
-                    'csv_subcategory': subcategory,
-                    'csv_account': account,
-                    'owner': owner,
-                    'csv_account_type': account_type,
-                    'is_expense': is_expense,
-                    'is_income': is_income,
-                    'year': year,
-                    'month': month,
-                    'year_month': year_month,
-                    'weekday': weekday,
-                    'transfer_pair_id': self.get_column_value(row, 'transfer_pair_id') or None
+                    # Enhanced fields from your CSV format
+                    'full_description': safe_get('full_description'),
+                    'main_category': safe_get('main_category'),
+                    'csv_category': safe_get('category'),
+                    'csv_subcategory': safe_get('subcategory'),
+                    'csv_account': safe_get('account'),
+                    'owner': safe_get('owner'),
+                    'csv_account_type': safe_get('account_type'),
+                    
+                    # Pre-calculated fields
+                    'amount_abs': self.normalize_amount(row.get(column_map.get('amount_abs', ''), amount)),
+                    'is_expense': safe_get_bool('is_expense'),
+                    'is_income': safe_get_bool('is_income'),
+                    
+                    # Date components
+                    'year': safe_get_int('year', date.year),
+                    'month': safe_get_int('month', date.month),
+                    'year_month': safe_get('year_month') or f"{date.year}-{date.month:02d}",
+                    'weekday': safe_get('weekday') or date.strftime('%A'),
+                    
+                    # Transfer linking
+                    'transfer_pair_id': safe_get('transfer_pair_id') or None,
+                    
+                    # Determine transaction type
+                    'transaction_type': self._determine_transaction_type(
+                        safe_get_bool('is_income'),
+                        safe_get_bool('is_expense'),
+                        amount,
+                        safe_get('merchant')
+                    ),
+                    
+                    # Metadata
+                    'confidence_score': None,  # Will be set by categorization
+                    'review_needed': False,    # Will be determined by rules
+                    'tags': None,
+                    'notes': None
                 }
                 
+                # Generate deduplication hash
+                transaction['hash_dedupe'] = self.generate_dedup_hash(user_id, transaction)
+                
                 transactions.append(transaction)
+                self.stats['processed_rows'] += 1
+                
+                # Progress logging for large files
+                if (index + 1) % 1000 == 0:
+                    logger.info(f"Processed {index + 1}/{len(df)} rows...")
                 
             except Exception as e:
-                self.errors.append(f"Row {index + 1}: {str(e)}")
-                logger.error(f"Error processing row {index + 1}: {e}")
+                error_msg = f"Row {index + 1}: {str(e)}"
+                self.errors.append(error_msg)
+                self.stats['error_rows'] += 1
+                logger.debug(f"Error processing row {index + 1}: {e}")
                 continue
         
-        logger.info(f"Successfully processed {len(transactions)} transactions from {len(df)} rows")
+        # Calculate success rate
+        self.stats['success_rate'] = (
+            self.stats['processed_rows'] / self.stats['total_rows'] 
+            if self.stats['total_rows'] > 0 else 0
+        )
+        
+        logger.info(f"✅ Processing complete: {self.stats['processed_rows']}/{self.stats['total_rows']} rows successful ({self.stats['success_rate']:.1%})")
+        
         return transactions
     
-    def get_processing_summary(self, total_rows: int, processed_transactions: List[Dict]) -> Dict:
-        """Get summary of processing results"""
-        # Analyze transaction types
-        type_counts = {}
-        category_counts = {}
+    def _determine_transaction_type(self, is_income: bool, is_expense: bool, amount: Decimal, merchant: str) -> str:
+        """Determine transaction type using available data"""
+        if is_income:
+            return "income"
+        elif is_expense:
+            return "expense"
         
-        for trans in processed_transactions:
-            trans_type = trans.get('transaction_type', 'unknown')
-            type_counts[trans_type] = type_counts.get(trans_type, 0) + 1
-            
-            main_cat = trans.get('main_category', 'uncategorized')
-            if main_cat:
-                category_counts[main_cat] = category_counts.get(main_cat, 0) + 1
+        # Fallback logic
+        if amount is None:
+            return "unknown"
         
+        # Check for transfer keywords
+        transfer_keywords = ['transfer', 'xfer', 'payment to', 'payment from', 'internal', 'between accounts']
+        if any(keyword in merchant.lower() for keyword in transfer_keywords):
+            return "transfer"
+        
+        # Amount-based detection
+        if amount > 0:
+            return "income"
+        elif amount < 0:
+            return "expense"
+        else:
+            return "transfer"
+    
+    def get_processing_summary(self) -> Dict[str, Any]:
+        """Generate comprehensive processing summary"""
         return {
-            "total_rows": total_rows,
-            "processed_rows": len(processed_transactions),
-            "errors": len(self.errors),
-            "warnings": len(self.warnings),
-            "error_messages": self.errors,
-            "warning_messages": self.warnings,
-            "success_rate": len(processed_transactions) / total_rows if total_rows > 0 else 0,
-            "transaction_types": type_counts,
-            "category_distribution": category_counts,
-            "column_mappings": self.column_map,
-            "date_range": {
-                "earliest": min(t['posted_at'] for t in processed_transactions).isoformat() if processed_transactions else None,
-                "latest": max(t['posted_at'] for t in processed_transactions).isoformat() if processed_transactions else None
-            }
+            'total_rows': self.stats['total_rows'],
+            'processed_rows': self.stats['processed_rows'],
+            'error_rows': self.stats['error_rows'],
+            'errors': len(self.errors),
+            'warnings': len(self.warnings),
+            'error_messages': self.errors[:10],  # Limit to first 10
+            'warning_messages': self.warnings[:10],  # Limit to first 10
+            'success_rate': self.stats['success_rate'],
+            'column_mappings': {},  # Will be filled by calling code
+            'processing_stats': self.stats
         }
 
-def process_csv_upload(file_content: Union[str, bytes], filename: str, user_id: str, account_id: str = None) -> Tuple[List[Dict], Dict]:
-    """Main function to process a CSV upload with enhanced error handling"""
-    processor = CSVProcessor()
+
+def process_csv_upload(
+    file_content: Union[str, bytes], 
+    filename: str, 
+    user_id: str, 
+    account_id: str = None
+) -> Tuple[List[Dict], Dict]:
+    """
+    Main entry point for CSV processing
+    
+    Args:
+        file_content: Raw file content (string or bytes)
+        filename: Original filename
+        user_id: User identifier
+        account_id: Account identifier (optional)
+    
+    Returns:
+        Tuple of (transactions_list, summary_dict)
+    """
+    processor = EnhancedCSVProcessor()
     
     try:
-        logger.info(f"Starting CSV processing for file: {filename}")
+        logger.info(f"🚀 Starting enhanced CSV processing for: {filename}")
+        logger.info(f"📊 File size: {len(file_content)} {'bytes' if isinstance(file_content, bytes) else 'characters'}")
         
-        # Parse CSV
-        df = processor.parse_csv_file(file_content, filename)
-        logger.info(f"CSV parsed successfully: {len(df)} rows, {len(df.columns)} columns")
+        # Step 1: Parse CSV
+        df = processor.parse_csv_content(file_content, filename)
+        logger.info(f"✅ CSV parsed: {len(df)} rows × {len(df.columns)} columns")
         
-        # Process transactions
-        transactions = processor.process_transactions(df, user_id, account_id)
-        logger.info(f"Processed {len(transactions)} transactions")
+        # Step 2: Process transactions
+        transactions = processor.process_dataframe(df, user_id, account_id)
+        logger.info(f"✅ Transactions processed: {len(transactions)} created")
         
-        # Get summary
-        summary = processor.get_processing_summary(len(df), transactions)
+        # Step 3: Generate summary
+        summary = processor.get_processing_summary()
         
+        # Add additional summary data
+        if transactions:
+            summary.update({
+                'date_range': {
+                    'earliest': min(t['posted_at'] for t in transactions).isoformat(),
+                    'latest': max(t['posted_at'] for t in transactions).isoformat()
+                },
+                'transaction_types': {
+                    t_type: len([t for t in transactions if t['transaction_type'] == t_type])
+                    for t_type in set(t['transaction_type'] for t in transactions)
+                },
+                'category_distribution': {
+                    cat: len([t for t in transactions if t['main_category'] == cat])
+                    for cat in set(t['main_category'] for t in transactions if t['main_category'])
+                }
+            })
+        else:
+            summary.update({
+                'date_range': {'earliest': None, 'latest': None},
+                'transaction_types': {},
+                'category_distribution': {}
+            })
+        
+        logger.info(f"🎉 Processing completed successfully!")
         return transactions, summary
         
     except Exception as e:
-        logger.error(f"CSV processing failed: {e}")
-        summary = {
-            "total_rows": 0,
-            "processed_rows": 0,
-            "errors": 1,
-            "warnings": 0,
-            "error_messages": [f"Processing failed: {str(e)}"],
-            "warning_messages": processor.warnings,
-            "success_rate": 0,
-            "transaction_types": {},
-            "category_distribution": {},
-            "column_mappings": {},
-            "date_range": {"earliest": None, "latest": None}
+        logger.error(f"💥 Processing failed: {str(e)}")
+        
+        error_summary = {
+            'total_rows': 0,
+            'processed_rows': 0,
+            'error_rows': 0,
+            'errors': 1,
+            'warnings': len(processor.warnings),
+            'error_messages': [f"Processing failed: {str(e)}"],
+            'warning_messages': processor.warnings,
+            'success_rate': 0.0,
+            'transaction_types': {},
+            'category_distribution': {},
+            'date_range': {'earliest': None, 'latest': None},
+            'processing_stats': processor.stats
         }
-        return [], summary
+        
+        return [], error_summary

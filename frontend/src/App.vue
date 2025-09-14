@@ -163,7 +163,6 @@
             @keypress.enter="sendMessage()"
             @click="showHistory = true"
             :disabled="loading"
-            placeholder="Ask about your finances..."
           >
           <button 
             class="btn btn-link" 
