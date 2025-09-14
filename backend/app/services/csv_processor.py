@@ -45,6 +45,7 @@ class EnhancedCSVProcessor:
     
     # Date formats to try (most common first for performance)
     DATE_FORMATS = [
+        '%d %m %Y',           # 26 08 2020 (your format)
         '%Y-%m-%d',           # 2023-12-25
         '%m/%d/%Y',           # 12/25/2023
         '%d/%m/%Y',           # 25/12/2023
@@ -141,7 +142,7 @@ class EnhancedCSVProcessor:
                     # Validate the parsed result
                     if len(df.columns) >= 10 and len(df) > 0:  # Should have at least 10 columns for financial data
                         successful_strategy = strategy
-                        logger.info(f"✅ Successfully parsed with strategy {i}")
+                        logger.info(f"Successfully parsed with strategy {i}")
                         logger.info(f"DataFrame shape: {df.shape}")
                         logger.info(f"Columns: {list(df.columns)}")
                         break
@@ -162,7 +163,7 @@ class EnhancedCSVProcessor:
             if len(df) == 0:
                 raise ValueError("No valid data rows found after cleaning")
             
-            logger.info(f"✅ Final DataFrame: {len(df)} rows × {len(df.columns)} columns")
+            logger.info(f"Final DataFrame: {len(df)} rows × {len(df.columns)} columns")
             logger.info(f"Columns: {list(df.columns)}")
             
             return df
@@ -187,7 +188,7 @@ class EnhancedCSVProcessor:
             for actual_col in available_columns:
                 if actual_col.lower() == expected_col.lower():
                     column_mapping[internal_name] = actual_col
-                    logger.info(f"✅ Exact match: {internal_name} ← {actual_col}")
+                    logger.info(f"Exact match: {internal_name} ← {actual_col}")
                     break
         
         # Fuzzy matches for unmapped columns
@@ -208,18 +209,18 @@ class EnhancedCSVProcessor:
                     self._fuzzy_match(expected_lower, actual_lower)):
                     
                     column_mapping[internal_name] = actual_col
-                    logger.info(f"🔍 Fuzzy match: {internal_name} ← {actual_col}")
+                    logger.info(f"Fuzzy match: {internal_name} ← {actual_col}")
                     remaining_actual.discard(actual_col)
                     break
         
         # Log unmapped columns
         unmapped = remaining_expected
         if unmapped:
-            logger.warning(f"⚠️ Unmapped expected columns: {unmapped}")
+            logger.warning(f"Unmapped expected columns: {unmapped}")
         
         unused = remaining_actual
         if unused:
-            logger.info(f"ℹ️ Unused CSV columns: {unused}")
+            logger.info(f"Unused CSV columns: {unused}")
         
         return column_mapping
     
@@ -266,9 +267,9 @@ class EnhancedCSVProcessor:
             except ValueError:
                 continue
         
-        # Fallback to pandas parser
+        # Fallback to pandas parser with dayfirst=True for European dates
         try:
-            parsed_date = pd.to_datetime(date_str, infer_datetime_format=True)
+            parsed_date = pd.to_datetime(date_str, dayfirst=True)
             if pd.notna(parsed_date):
                 dt = parsed_date.to_pydatetime()
                 if 1990 <= dt.year <= 2030:
@@ -356,13 +357,11 @@ class EnhancedCSVProcessor:
     
     def generate_dedup_hash(self, user_id: str, row_data: Dict) -> str:
         """Generate consistent hash for deduplication"""
-        # Use key fields for deduplication
+        # Use only date and amount for deduplication to avoid false duplicates
         date_str = row_data.get('date', '').strftime('%Y-%m-%d') if row_data.get('date') else ''
         amount_str = str(row_data.get('amount', '0'))
-        merchant = re.sub(r'[^\w\s]', '', (row_data.get('merchant', '') or '')).lower()
-        message = re.sub(r'[^\w\s]', '', (row_data.get('message', '') or ''))[:100].lower()
         
-        content = f"{user_id}_{date_str}_{amount_str}_{merchant}_{message}"
+        content = f"{user_id}_{date_str}_{amount_str}"
         return hashlib.sha256(content.encode()).hexdigest()
     
     def process_dataframe(self, df: pd.DataFrame, user_id: str, account_id: str = None) -> List[Dict]:
@@ -433,7 +432,7 @@ class EnhancedCSVProcessor:
                     'account_id': account_id,
                     'posted_at': date,
                     'amount': amount,
-                    'currency': 'USD',  # Default
+                    'currency': 'EUR',  # Default for European data
                     'merchant': safe_get('merchant'),
                     'memo': safe_get('message'),
                     'import_batch_id': batch_id,
@@ -500,7 +499,7 @@ class EnhancedCSVProcessor:
             if self.stats['total_rows'] > 0 else 0
         )
         
-        logger.info(f"✅ Processing complete: {self.stats['processed_rows']}/{self.stats['total_rows']} rows successful ({self.stats['success_rate']:.1%})")
+        logger.info(f"Processing complete: {self.stats['processed_rows']}/{self.stats['total_rows']} rows successful ({self.stats['success_rate']:.1%})")
         
         return transactions
     
@@ -565,16 +564,16 @@ def process_csv_upload(
     processor = EnhancedCSVProcessor()
     
     try:
-        logger.info(f"🚀 Starting enhanced CSV processing for: {filename}")
-        logger.info(f"📊 File size: {len(file_content)} {'bytes' if isinstance(file_content, bytes) else 'characters'}")
+        logger.info(f"Starting enhanced CSV processing for: {filename}")
+        logger.info(f"File size: {len(file_content)} {'bytes' if isinstance(file_content, bytes) else 'characters'}")
         
         # Step 1: Parse CSV
         df = processor.parse_csv_content(file_content, filename)
-        logger.info(f"✅ CSV parsed: {len(df)} rows × {len(df.columns)} columns")
+        logger.info(f"CSV parsed: {len(df)} rows × {len(df.columns)} columns")
         
         # Step 2: Process transactions
         transactions = processor.process_dataframe(df, user_id, account_id)
-        logger.info(f"✅ Transactions processed: {len(transactions)} created")
+        logger.info(f"Transactions processed: {len(transactions)} created")
         
         # Step 3: Generate summary
         summary = processor.get_processing_summary()
@@ -602,11 +601,11 @@ def process_csv_upload(
                 'category_distribution': {}
             })
         
-        logger.info(f"🎉 Processing completed successfully!")
+        logger.info(f"Processing completed successfully!")
         return transactions, summary
         
     except Exception as e:
-        logger.error(f"💥 Processing failed: {str(e)}")
+        logger.error(f"Processing failed: {str(e)}")
         
         error_summary = {
             'total_rows': 0,

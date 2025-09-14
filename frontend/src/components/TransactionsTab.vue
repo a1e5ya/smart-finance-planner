@@ -612,7 +612,7 @@ export default {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'multipart/form-data'
             },
-            timeout: 120000
+            timeout: 300000
           })
           
           upload.status = 'success'

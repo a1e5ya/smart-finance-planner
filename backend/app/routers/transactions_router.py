@@ -5,7 +5,7 @@ Main transactions router with CRUD operations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from typing import List, Optional
 from datetime import date, datetime
 import uuid
@@ -353,3 +353,60 @@ async def delete_import_batch(
         },
         status_code=200
     )
+
+@router.post("/reset")
+async def reset_all_transactions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Reset all transaction data for the current user"""
+    
+    try:
+        from sqlalchemy import delete
+        from ..models.database import Transaction, ImportBatch
+        
+        # Count transactions before deletion
+        count_query = select(func.count(Transaction.id)).where(Transaction.user_id == current_user.id)
+        count_result = await db.execute(count_query)
+        transaction_count = count_result.scalar()
+        
+        # Delete all transactions for this user
+        delete_transactions = delete(Transaction).where(Transaction.user_id == current_user.id)
+        await db.execute(delete_transactions)
+        
+        # Delete all import batches for this user
+        delete_batches = delete(ImportBatch).where(ImportBatch.user_id == current_user.id)
+        await db.execute(delete_batches)
+        
+        await db.commit()
+        
+        # Log the reset action
+        audit_entry = AuditLog(
+            user_id=current_user.id,
+            firebase_uid=current_user.firebase_uid,
+            entity="transaction",
+            action="reset_all",
+            details={
+                "transactions_deleted": transaction_count,
+                "reason": "user_requested_reset"
+            }
+        )
+        db.add(audit_entry)
+        await db.commit()
+        
+        print(f"✅ Reset complete: {transaction_count} transactions deleted for user {current_user.email}")
+        
+        return {
+            "success": True,
+            "message": f"Successfully deleted {transaction_count} transactions",
+            "deleted_count": transaction_count
+        }
+        
+    except Exception as e:
+        print(f"❌ Reset failed for user {current_user.email}: {e}")
+        await db.rollback()
+        return {
+            "success": False,
+            "message": f"Reset failed: {str(e)}",
+            "deleted_count": 0
+        }

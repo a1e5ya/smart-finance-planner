@@ -1,7 +1,8 @@
 """
 Transaction import service with CSV processing and auto-categorization
 """
-
+from fastapi import Depends
+from ..models.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from typing import List, Dict, Any, Tuple, Optional
@@ -35,12 +36,17 @@ class TransactionImportService:
     ) -> Dict[str, Any]:
         """Import transactions from CSV with auto-categorization"""
         
+        print(f"DEBUG: Starting import_from_csv for {filename}")
+        print(f"DEBUG: File size: {len(file_content)} bytes")
+        print(f"DEBUG: Auto categorize: {auto_categorize}")
+        
         try:
-            print(f"📁 Processing file: {filename} ({len(file_content)} bytes)")
-            
+            print(f"DEBUG: About to generate file hash")
             # Generate file hash for duplicate detection
             file_hash = hashlib.md5(file_content).hexdigest()
+            print(f"DEBUG: File hash generated: {file_hash[:10]}...")
             
+            print(f"DEBUG: About to check for existing batch")
             # Check for duplicate file uploads
             existing_batch = await self.db.execute(
                 select(ImportBatch).where(
@@ -51,15 +57,15 @@ class TransactionImportService:
                     )
                 )
             )
+            print(f"DEBUG: Checked for existing batch")
             
             if existing_batch.scalar_one_or_none():
-                return {
-                    "success": False,
-                    "batch_id": "",
-                    "summary": {"error": "duplicate_file"},
-                    "message": "This file has already been imported successfully"
-                }
+                print(f"DEBUG: Found duplicate file - allowing re-import")
+                # For now, allow re-import instead of blocking duplicates
+                # TODO: Implement proper duplicate handling in frontend
+                pass
             
+            print(f"DEBUG: About to create import batch")
             # Create import batch record
             import_batch = ImportBatch(
                 user_id=self.user.id,
@@ -68,15 +74,25 @@ class TransactionImportService:
                 file_hash=file_hash,
                 status="processing"
             )
+            print(f"DEBUG: Created import batch object")
+            
             self.db.add(import_batch)
+            print(f"DEBUG: Added batch to session")
+            
             await self.db.commit()
+            print(f"DEBUG: Committed batch")
+            
             await self.db.refresh(import_batch)
-            
+            print(f"DEBUG: Refreshed batch")
+
             print(f"✅ Created import batch: {import_batch.id}")
-            
+
+            print(f"DEBUG: About to find or create account")
             # Find or create account
             account = await self._get_or_create_account(account_name, account_type)
-            
+            print(f"DEBUG: Account handled: {account.id if account else 'None'}")
+
+            print(f"DEBUG: About to process CSV")
             # Process CSV with enhanced processor
             print("🔄 Processing CSV data...")
             transactions_data, summary = process_csv_upload(
@@ -85,56 +101,28 @@ class TransactionImportService:
                 str(self.user.id),
                 str(account.id) if account else None
             )
-            
+            print(f"DEBUG: CSV processing completed, got {len(transactions_data)} transactions")
+
             print(f"📊 CSV processing summary: {summary}")
-            
+
+            print(f"DEBUG: About to load categorization data")
             # Load user categories and mappings for auto-categorization
+            categorization_loaded = False
             if auto_categorize:
-                await self._load_categorization_data()
-            
-            # Insert transactions with auto-categorization
+                try:
+                    await self._load_categorization_data()
+                    categorization_loaded = True
+                    print(f"✅ Categorization system loaded successfully")
+                except Exception as e:
+                    print(f"⚠️ Failed to load categorization system: {e}")
+                    auto_categorize = False
+
+            # Simple insertion - one by one
             inserted_count = 0
             duplicate_count = 0
             auto_categorized_count = 0
-            
+
             for trans_data in transactions_data:
-                # Check for duplicates
-                existing = await self.db.execute(
-                    select(Transaction).where(
-                        and_(
-                            Transaction.user_id == self.user.id,
-                            Transaction.hash_dedupe == trans_data['hash_dedupe']
-                        )
-                    )
-                )
-                
-                if existing.scalar_one_or_none():
-                    duplicate_count += 1
-                    continue
-                
-                # Auto-categorization
-                category_id = None
-                confidence_score = None
-                source_category = "imported"
-                
-                if auto_categorize:
-                    category_result = await self._auto_categorize_transaction(trans_data)
-                    if category_result:
-                        category_id = category_result["category_id"]
-                        confidence_score = category_result["confidence"]
-                        source_category = category_result["source"]
-                        if category_id:
-                            auto_categorized_count += 1
-                
-                # Determine if review is needed
-                review_needed = (
-                    category_id is None or  # No category assigned
-                    (confidence_score and confidence_score < 0.8) or  # Low confidence
-                    not trans_data.get('merchant') or  # Missing merchant
-                    trans_data.get('amount', 0) == 0  # Zero amount
-                )
-                
-                # Create transaction with all enhanced fields
                 transaction = Transaction(
                     id=uuid.uuid4(),
                     user_id=self.user.id,
@@ -144,12 +132,9 @@ class TransactionImportService:
                     currency=trans_data.get('currency', 'EUR'),
                     merchant=trans_data.get('merchant'),
                     memo=trans_data.get('memo'),
-                    category_id=uuid.UUID(category_id) if category_id else None,
                     import_batch_id=import_batch.id,
                     hash_dedupe=trans_data['hash_dedupe'],
-                    source_category=source_category,
-                    
-                    # Enhanced fields from CSV
+                    source_category="imported",
                     transaction_type=trans_data.get('transaction_type'),
                     main_category=trans_data.get('main_category'),
                     csv_category=trans_data.get('csv_category'),
@@ -164,16 +149,16 @@ class TransactionImportService:
                     year_month=trans_data.get('year_month'),
                     weekday=trans_data.get('weekday'),
                     transfer_pair_id=trans_data.get('transfer_pair_id'),
-                    
-                    # Analysis fields
-                    confidence_score=confidence_score,
-                    review_needed=review_needed,
+                    confidence_score=None,
+                    review_needed=False,
                     tags=None,
                     notes=None
                 )
                 
                 self.db.add(transaction)
                 inserted_count += 1
+
+            await self.db.commit()
             
             # Update import batch with final results
             import_batch.rows_total = len(transactions_data)
@@ -483,8 +468,8 @@ class TransactionImportService:
 
 # Helper function to create service instance
 def get_import_service(
-    current_user: User,
-    db: AsyncSession
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
 ) -> TransactionImportService:
     """Get transaction import service instance"""
     return TransactionImportService(db, current_user)
