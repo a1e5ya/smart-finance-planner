@@ -1,9 +1,7 @@
 <template>
   <div class="tab-content">
-    <div class="container text-center" style="height: 25rem;">
-      <div class="text-large">Welcome to Your Financial Dashboard</div>
-      <div class="text-medium text-light">Your personalized financial overview will appear here</div>
-      <div class="text-small text-light">Import transactions to see charts, insights, and analytics</div>
+    <div class="container" style=" display: flex; justify-content: center; align-items: center;">
+      <img src="@/assets/filler.png" alt="Dashboard Preview" class="filler-image" />
     </div>
   </div>
 </template>
@@ -13,3 +11,10 @@ export default {
   name: 'DashboardTab'
 }
 </script>
+
+<style scoped>
+.filler-image {
+height: 20rem;
+margin: 10%;
+}
+</style>

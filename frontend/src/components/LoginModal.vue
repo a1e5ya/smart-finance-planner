@@ -227,14 +227,14 @@ export default {
 }
 
 .fullscreen-content {
-  background: rgba(255, 255, 255, 0.1);
+
   backdrop-filter: blur(20px);
   border-radius: 30px;
   padding: 0;
   width: 100%;
   max-width: 400px;
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+
 }
 
 /* Common Styles */
@@ -247,7 +247,7 @@ export default {
 }
 
 .fullscreen-content h2 {
-  color: white;
+  color: rgb(0, 0, 0);
   margin-bottom: var(--gap-large);
 }
 
@@ -284,20 +284,10 @@ export default {
 }
 
 .fullscreen-content .divider {
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 0, 0, 0.8);
 }
 
-.divider::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: currentColor;
-  z-index: -1;
-  opacity: 0.3;
-}
+
 
 .divider {
   background: var(--color-background-light);
@@ -336,8 +326,8 @@ export default {
 .auth-btn {
   width: 100%;
   padding: var(--gap-small) var(--gap-standard);
-  background: var(--color-button-active);
-  color: var(--color-button-text-active);
+
+  color: #000;
   border: none;
   border-radius: var(--radius);
   font-size: var(--text-medium);
@@ -349,8 +339,7 @@ export default {
 }
 
 .fullscreen-auth-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(255, 255, 255, 0.2) !important;
   border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -368,13 +357,12 @@ export default {
 
 .toggle-text {
   text-align: center;
-  color: var(--color-text-light);
   font-size: var(--text-small);
   margin: 0;
 }
 
 .fullscreen-toggle-text {
-  color: rgba(255, 255, 255, 0.8);
+
 }
 
 .toggle-btn {
@@ -388,7 +376,7 @@ export default {
 }
 
 .fullscreen-content .toggle-btn {
-  color: white;
+
 }
 
 .error-message {

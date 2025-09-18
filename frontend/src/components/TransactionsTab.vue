@@ -98,69 +98,86 @@
         </div>
       </div>
       
-      <!-- Expandable Filters -->
+      <!-- Expandable Filters - Reorganized -->
       <div class="filters-panel" v-if="showFilters">
-        <div class="filters-grid">
+        <div class="filters-row">
+          <!-- Date Range Filters -->
           <div class="filter-group">
-            <label>Date Range</label>
-            <div class="date-inputs">
-              <input 
-                type="date" 
-                v-model="filters.startDate"
-                class="filter-input"
-                placeholder="Start Date"
-              >
-              <input 
-                type="date" 
-                v-model="filters.endDate"
-                class="filter-input"
-                placeholder="End Date"
-              >
-            </div>
+            <label>From Date</label>
+            <input 
+              type="date" 
+              v-model="filters.startDate"
+              class="filter-input"
+            >
           </div>
           
           <div class="filter-group">
-            <label>Amount Range (€)</label>
-            <div class="amount-inputs">
-              <input 
-                type="number" 
-                v-model.number="filters.minAmount"
-                class="filter-input"
-                placeholder="Min €"
-                step="0.01"
-              >
-              <input 
-                type="number" 
-                v-model.number="filters.maxAmount"
-                class="filter-input"
-                placeholder="Max €"
-                step="0.01"
-              >
-            </div>
+            <label>To Date</label>
+            <input 
+              type="date" 
+              v-model="filters.endDate"
+              class="filter-input"
+            >
+          </div>
+          
+          <!-- Amount Range Filters -->
+          <div class="filter-group">
+            <label>Min Amount (€)</label>
+            <input 
+              type="number" 
+              v-model.number="filters.minAmount"
+              class="filter-input"
+              placeholder="0.00"
+              step="0.01"
+            >
           </div>
           
           <div class="filter-group">
+            <label>Max Amount (€)</label>
+            <input 
+              type="number" 
+              v-model.number="filters.maxAmount"
+              class="filter-input"
+              placeholder="1000.00"
+              step="0.01"
+            >
+          </div>
+        </div>
+        
+        <div class="filters-row">
+          <!-- Search and Category Filters -->
+          <div class="filter-group filter-search">
             <label>Search</label>
             <input 
               type="text" 
               v-model="filters.merchant"
               class="filter-input"
-              placeholder="Search merchant or description..."
+              placeholder="Search merchant, message..."
             >
           </div>
           
           <div class="filter-group">
             <label>Category</label>
-            <select v-model="filters.categoryId" class="filter-input">
+            <select v-model="filters.mainCategory" class="filter-input">
               <option value="">All Categories</option>
-              <option v-for="category in allCategories" :key="category.id" :value="category.id">
-                {{ category.name }}
+              <option v-for="category in uniqueMainCategories" :key="category" :value="category">
+                {{ category }}
               </option>
             </select>
           </div>
           
           <div class="filter-group">
-            <label>Type</label>
+            <label>Subcategory</label>
+            <select v-model="filters.categoryFilter" class="filter-input">
+              <option value="">All Subcategories</option>
+              <option v-for="category in uniqueCategories" :key="category" :value="category">
+                {{ category }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="filter-group">
+            <label>Transaction Type</label>
             <select v-model="filters.transactionType" class="filter-input">
               <option value="">All Types</option>
               <option value="income">Income</option>
@@ -234,20 +251,21 @@
                   {{ sortOrder === 'desc' ? '↓' : '↑' }}
                 </span>
               </th>
-              <th class="col-merchant clickable" @click="toggleSort('merchant')">
-                Merchant
-                <span v-if="sortBy === 'merchant'">
-                  {{ sortOrder === 'desc' ? '↓' : '↑' }}
-                </span>
-              </th>
               <th class="col-amount clickable" @click="toggleSort('amount')">
                 Amount
                 <span v-if="sortBy === 'amount'">
                   {{ sortOrder === 'desc' ? '↓' : '↑' }}
                 </span>
               </th>
+              <th class="col-merchant clickable" @click="toggleSort('merchant')">
+                Merchant
+                <span v-if="sortBy === 'merchant'">
+                  {{ sortOrder === 'desc' ? '↓' : '↑' }}
+                </span>
+              </th>
               <th class="col-category">Category</th>
-              <th class="col-type">Type</th>
+              <th class="col-category">Account</th>
+              <th class="col-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -256,7 +274,6 @@
               :key="transaction.id"
               class="transaction-row"
               :class="{ 
-                'uncategorized': !transaction.category_name,
                 'selected': selectedTransactions.includes(transaction.id),
                 'auto-categorizing': categorizingTransactions.includes(transaction.id)
               }"
@@ -274,55 +291,26 @@
                 <div class="date-secondary">{{ transaction.weekday }}</div>
               </td>
               
-              <td class="col-merchant">
-                <div class="merchant-primary">{{ transaction.merchant || 'Unknown Merchant' }}</div>
-                <div class="merchant-secondary" v-if="transaction.memo">
-                  {{ truncateText(transaction.memo, 60) }}
-                </div>
-                <div class="merchant-csv" v-if="transaction.csv_category">
-                  CSV: {{ transaction.csv_category }}
-                  <span v-if="transaction.csv_subcategory"> → {{ transaction.csv_subcategory }}</span>
-                </div>
-              </td>
-              
               <td class="col-amount" :class="getAmountClass(transaction)">
                 <div class="amount-primary">{{ formatAmount(transaction.amount) }}</div>
                 <div class="amount-secondary" v-if="transaction.transfer_pair_id">
-                  Transfer: {{ transaction.transfer_pair_id }}
+                  Transfer ID: {{ transaction.transfer_pair_id }}
+                </div>
+              </td>
+              
+              <td class="col-merchant">
+                <div class="merchant-primary">{{ transaction.merchant || 'Unknown Merchant' }}</div>
+                <div class="merchant-secondary" v-if="transaction.memo">
+                  {{ truncateText(transaction.memo, 80) }}
                 </div>
               </td>
               
               <td class="col-category">
-                <!-- Show assigned category with edit button -->
-                <div v-if="transaction.category_name" class="category-assigned">
-                  <span class="category-name">{{ transaction.category_name }}</span>
-                  <button 
-                    class="btn btn-small btn-link edit-category-btn" 
-                    @click="startEditingCategory(transaction.id)"
-                    title="Edit category"
-                  >
-                    Edit
-                  </button>
+                <div class="category-assigned" v-if="transaction.main_category">
+                  <div class="category-name">{{ transaction.main_category }}</div>
+                  <div class="category-name" v-if="transaction.csv_category">{{ transaction.csv_category }}</div>
                 </div>
-                
-                <!-- Show "Auto-categorizing..." for transactions being processed -->
-                <div v-else-if="categorizingTransactions.includes(transaction.id)" class="category-processing">
-                  <span class="category-status">Auto-categorizing...</span>
-                </div>
-                
-                <!-- Show "Uncategorized" for transactions without categories -->
-                <div v-else class="category-uncategorized">
-                  <span class="category-status">Uncategorized</span>
-                  <button 
-                    class="btn btn-small btn-link edit-category-btn" 
-                    @click="startEditingCategory(transaction.id)"
-                    title="Assign category"
-                  >
-                    Assign
-                  </button>
-                </div>
-                
-                <!-- Show dropdown only when editing -->
+                <div v-else class="text-muted">-</div>
                 <div v-if="transaction.editing_category" class="category-selector-edit">
                   <select 
                     @change="categorizeTransaction(transaction.id, $event.target.value)"
@@ -355,10 +343,33 @@
                 </div>
               </td>
               
-              <td class="col-type">
-                <span class="type-badge" :class="transaction.transaction_type">
-                  {{ formatTransactionType(transaction.transaction_type) }}
-                </span>
+
+              
+              <td class="col-category">
+                <div class="category-assigned" v-if="transaction.owner || transaction.csv_account">
+                  <div class="category-name" v-if="transaction.owner">{{ transaction.owner }}</div>
+                  <div class="merchant-secondary" v-if="transaction.csv_account">{{ transaction.csv_account }}</div>
+                </div>
+                <div v-else class="text-muted">-</div>
+              </td>
+              
+              <td class="col-actions">
+                <div class="action-buttons">
+                  <!-- Show edit button for category assignment -->
+                  <button 
+                    v-if="!transaction.editing_category"
+                    class="btn btn-small btn-link" 
+                    @click="startEditingCategory(transaction.id)"
+                    title="Assign category"
+                  >
+                    Edit
+                  </button>
+                  
+                  <!-- Show "Auto-categorizing..." for transactions being processed -->
+                  <span v-if="categorizingTransactions.includes(transaction.id)" class="text-muted">
+                    Processing...
+                  </span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -475,7 +486,7 @@ export default {
     const sortBy = ref('posted_at')
     const sortOrder = ref('desc')
     
-    // Filter state refs
+    // Filter state refs - updated for new structure
     const showFilters = ref(false)
     const filters = ref({
       startDate: '',
@@ -483,7 +494,8 @@ export default {
       minAmount: null,
       maxAmount: null,
       merchant: '',
-      categoryId: '',
+      mainCategory: '',
+      categoryFilter: '',
       transactionType: ''
     })
     
@@ -496,7 +508,27 @@ export default {
     const showResetModal = ref(false)
     const resetting = ref(false)
 
-    // Computed properties
+    // Computed properties for filters
+    const uniqueMainCategories = computed(() => {
+      const categories = new Set()
+      transactions.value.forEach(t => {
+        if (t.main_category) {
+          categories.add(t.main_category)
+        }
+      })
+      return Array.from(categories).sort()
+    })
+
+    const uniqueCategories = computed(() => {
+      const categories = new Set()
+      transactions.value.forEach(t => {
+        if (t.csv_category) {
+          categories.add(t.csv_category)
+        }
+      })
+      return Array.from(categories).sort()
+    })
+
     const hasActiveFilters = computed(() => {
       return Object.values(filters.value).some(value => value !== '' && value !== null)
     })
@@ -595,7 +627,7 @@ export default {
         
         emit('add-chat-message', {
           message: `Uploading: ${file.name}`,
-          response: `Processing ${file.name}... Categories from CSV will be automatically applied.`
+          response: `Processing ${file.name}... CSV categories will be imported and displayed directly.`
         })
         
         try {
@@ -605,7 +637,7 @@ export default {
           formData.append('file', file)
           formData.append('account_name', 'Default Account')
           formData.append('account_type', 'checking')
-          formData.append('auto_categorize', 'true')
+          formData.append('auto_categorize', 'false') // No auto-categorization, just CSV data
           
           const response = await axios.post(`${API_BASE}/transactions/import`, formData, {
             headers: {
@@ -622,12 +654,10 @@ export default {
           
           const duplicatesMsg = response.data.summary.rows_duplicated ? 
             ` (${response.data.summary.rows_duplicated} duplicates skipped)` : ''
-          const categorizedMsg = response.data.summary.auto_categorized ? 
-            ` ${response.data.summary.auto_categorized} automatically categorized from CSV data.` : ''
           
           emit('add-chat-message', {
             message: `File uploaded: ${file.name}`,
-            response: `Successfully processed ${file.name} with ${upload.rows} transactions imported!${duplicatesMsg}${categorizedMsg}`
+            response: `Successfully imported ${file.name} with ${upload.rows} transactions!${duplicatesMsg} All CSV category data has been preserved.`
           })
           
           await loadSummary()
@@ -697,20 +727,35 @@ export default {
           ...(filters.value.startDate && { start_date: filters.value.startDate }),
           ...(filters.value.endDate && { end_date: filters.value.endDate }),
           ...(filters.value.merchant && { merchant: filters.value.merchant }),
-          ...(filters.value.categoryId && { category_id: filters.value.categoryId }),
           ...(filters.value.minAmount && { min_amount: filters.value.minAmount }),
           ...(filters.value.maxAmount && { max_amount: filters.value.maxAmount }),
           ...(filters.value.transactionType && { transaction_type: filters.value.transactionType })
+          // Note: mainCategory and categoryFilter would need backend support for CSV field filtering
         })
         
         const response = await axios.get(`${API_BASE}/transactions/list?${params}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         
-        transactions.value = response.data.map(transaction => ({
+        let transactionData = response.data.map(transaction => ({
           ...transaction,
           editing_category: false
         }))
+
+        // Client-side filtering for CSV categories since backend might not support them yet
+        if (filters.value.mainCategory) {
+          transactionData = transactionData.filter(t => 
+            t.main_category && t.main_category.toLowerCase().includes(filters.value.mainCategory.toLowerCase())
+          )
+        }
+
+        if (filters.value.categoryFilter) {
+          transactionData = transactionData.filter(t => 
+            t.csv_category && t.csv_category.toLowerCase().includes(filters.value.categoryFilter.toLowerCase())
+          )
+        }
+        
+        transactions.value = transactionData
         
         console.log('Loaded transactions:', transactions.value.length)
       } catch (error) {
@@ -726,7 +771,6 @@ export default {
               ...(filters.value.startDate && { start_date: filters.value.startDate }),
               ...(filters.value.endDate && { end_date: filters.value.endDate }),
               ...(filters.value.merchant && { merchant: filters.value.merchant }),
-              ...(filters.value.categoryId && { category_id: filters.value.categoryId }),
               ...(filters.value.minAmount && { min_amount: filters.value.minAmount }),
               ...(filters.value.maxAmount && { max_amount: filters.value.maxAmount }),
               ...(filters.value.transactionType && { transaction_type: filters.value.transactionType })
@@ -736,12 +780,27 @@ export default {
               headers: { 'Authorization': `Bearer ${newToken}` }
             })
             
-            transactions.value = retryResponse.data.map(transaction => ({
+            let retryData = retryResponse.data.map(transaction => ({
               ...transaction,
               editing_category: false
             }))
+
+            // Apply client-side CSV filtering on retry as well
+            if (filters.value.mainCategory) {
+              retryData = retryData.filter(t => 
+                t.main_category && t.main_category.toLowerCase().includes(filters.value.mainCategory.toLowerCase())
+              )
+            }
+
+            if (filters.value.categoryFilter) {
+              retryData = retryData.filter(t => 
+                t.csv_category && t.csv_category.toLowerCase().includes(filters.value.categoryFilter.toLowerCase())
+              )
+            }
             
-            console.log('Transaction retry successful:', retryResponse.data.length)
+            transactions.value = retryData
+            
+            console.log('Transaction retry successful:', retryData.length)
           } catch (retryError) {
             console.error('Transaction retry failed:', retryError)
           }
@@ -756,7 +815,7 @@ export default {
       await loadTransactions()
     }
 
-    // Transaction management methods
+    // Transaction management methods - simplified for CSV-first approach
     const startEditingCategory = (transactionId) => {
       const transaction = transactions.value.find(t => t.id === transactionId)
       if (transaction) {
@@ -794,8 +853,8 @@ export default {
         
         const category = props.allCategories.find(c => c.id === categoryId)
         emit('add-chat-message', {
-          message: 'Transaction categorized',
-          response: `Transaction successfully categorized as ${category?.name || 'selected category'}!`
+          message: 'Manual category override',
+          response: `Transaction manually categorized as ${category?.name || 'selected category'}! This overrides the CSV category.`
         })
         
         await loadTransactions()
@@ -804,7 +863,7 @@ export default {
       } catch (error) {
         console.error('Failed to categorize transaction:', error)
         emit('add-chat-message', {
-          response: 'Failed to categorize transaction. Please try again.'
+          response: 'Failed to apply manual category. Please try again.'
         })
       } finally {
         categorizingTransactions.value = categorizingTransactions.value.filter(id => id !== transactionId)
@@ -827,8 +886,8 @@ export default {
         
         const category = props.allCategories.find(c => c.id === bulkCategoryId.value)
         emit('add-chat-message', {
-          message: `Bulk categorization: ${selectedTransactions.value.length} transactions`,
-          response: `Successfully categorized ${selectedTransactions.value.length} transactions as ${category?.name || 'selected category'}!`
+          message: `Bulk manual categorization: ${selectedTransactions.value.length} transactions`,
+          response: `Successfully applied manual category ${category?.name || 'selected category'} to ${selectedTransactions.value.length} transactions! This overrides CSV categories.`
         })
         
         selectedTransactions.value = []
@@ -844,7 +903,7 @@ export default {
       }
     }
 
-    // Filter methods - simplified to direct value manipulation
+    // Filter methods - updated for new filter structure
     const clearFilters = () => {
       filters.value = {
         startDate: '',
@@ -852,7 +911,8 @@ export default {
         minAmount: null,
         maxAmount: null,
         merchant: '',
-        categoryId: '',
+        mainCategory: '',
+        categoryFilter: '',
         transactionType: ''
       }
     }
@@ -910,7 +970,6 @@ export default {
       try {
         const token = await props.user.getIdToken()
         
-        // Try POST method first (more widely supported)
         await axios.post(`${API_BASE}/transactions/reset`, {
           action: 'reset_all',
           confirm: true
@@ -926,7 +985,7 @@ export default {
         
         emit('add-chat-message', {
           message: 'Reset all transaction data',
-          response: 'All transaction data has been successfully reset. You can now import fresh data.'
+          response: 'All transaction data has been successfully reset. You can now import fresh CSV files.'
         })
         
         showResetModal.value = false
@@ -934,8 +993,6 @@ export default {
       } catch (error) {
         console.error('Reset failed:', error)
         
-        // For now, just show that reset is not available
-        // Since backend doesn't support reset endpoint yet
         const errorMessage = 'Reset feature is not yet implemented on the server. Please contact support or manually delete data through database.'
         
         emit('add-chat-message', {
@@ -1009,10 +1066,12 @@ export default {
       sortBy,
       sortOrder,
       
-      // Filters
+      // Filters - updated
       showFilters,
       filters,
       hasActiveFilters,
+      uniqueMainCategories,
+      uniqueCategories,
       
       // Selection and bulk actions
       selectedTransactions,

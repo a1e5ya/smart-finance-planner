@@ -841,7 +841,6 @@ margin: 0;
   padding: var(--gap-standard);
   background: var(--color-background-light);
   border-radius: var(--radius);
-  border-left: 0.25rem solid transparent;
 }
 
 
@@ -1176,7 +1175,6 @@ margin: 0;
   padding: 0.25rem 0.5rem;
   background: var(--color-background-light);
   border-radius: var(--radius);
-  border-left: 0.25rem solid #10b981;
 }
 
 .category-name {
@@ -1389,7 +1387,6 @@ margin: 0;
   padding: var(--gap-standard);
   background: rgba(239, 68, 68, 0.05);
   border-radius: var(--radius);
-  border-left: 0.25rem solid #ef4444;
 }
 
 .warning-icon {
